@@ -1,11 +1,11 @@
 const mineflayer = require('mineflayer');
 
-function createBot() {
-  const bot = mineflayer.createBot({
-    host: "skibidimustard.aternos.me",
-    port: 19470,
-    username: "messi",
-    version: "1.12.1"
+const bot = mineflayer.createBot({
+  host: "skibidimustard.aternos.me",
+  port: 19470,
+  username: "messi",
+  version: "1.12.1",
+  keepAlive: false // ✅ this helps prevent ghost connections
   });
 
   bot.on('spawn', () => {
