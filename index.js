@@ -11,6 +11,7 @@ function createBot() {
   bot.on('spawn', () => {
     console.log('✅ Bot joined');
 
+    // Jump every 10 seconds
     setInterval(() => {
       bot.setControlState('jump', true);
       setTimeout(() => bot.setControlState('jump', false), 500);
@@ -57,29 +58,30 @@ function createBot() {
     setInterval(() => {
       bot.chat(messages[index]);
       index = (index + 1) % messages.length;
-    }, 90000); // Increased to 90 seconds to avoid spam detection
+    }, 90000); // 90 seconds
   });
 
   bot.on('end', () => {
-    console.log("❌ Disconnected. Reconnecting in 10 seconds...");
-    setTimeout(createBot, 10000);
+    console.log("❌ Disconnected. Reconnecting in 90 seconds...");
+    setTimeout(createBot, 90000); // 90 sec delay
   });
 
   bot.on('error', err => {
     console.log("⚠️ Error:", err.message);
-    console.log("🔄 Attempting to reconnect in 15 seconds...");
-    setTimeout(createBot, 15000);
+    console.log("🔄 Attempting to reconnect in 90 seconds...");
+    setTimeout(createBot, 90000); // 90 sec delay
   });
 
   bot.on('kicked', (reason) => {
     console.log("🚫 Bot was kicked:", reason);
-    console.log("🔄 Reconnecting in 30 seconds...");
-    setTimeout(createBot, 30000);
+    console.log("🔄 Reconnecting in 90 seconds...");
+    setTimeout(createBot, 90000); // 90 sec delay
   });
 }
 
 createBot();
 
+// Keep alive using Express
 const express = require('express');
 const app = express();
 
