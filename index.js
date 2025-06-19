@@ -65,19 +65,30 @@ function createBot() {
   });
 
   // Detect when someone joins
-  bot.on('playerJoined', (player) => {
-    if (player.username !== bot.username) {
-      bot.chat(`weyyy ${player.username} dah masuk`);
-    }
-  });
+const recentJoins = new Set();
+const recentLeaves = new Set();
 
-  // Detect when someone leaves
-  bot.on('playerLeft', (player) => {
-    if (player.username !== bot.username) {
-      bot.chat(`yela babaii ${player.username}`);
-    }
-  });
+bot.on('playerJoined', (player) => {
+  if (player.username !== bot.username && !recentJoins.has(player.username)) {
+    recentJoins.add(player.username);
+    setTimeout(() => {
+      bot.chat(`weyyy ${player.username} dah masuk piwitt Hi, I have autism too! It’s so nice for someone to raise awareness about our condition. Sending hugs!`);
+      // Remove from set after a few seconds to allow future detection
+      setTimeout(() => recentJoins.delete(player.username), 5000);
+    }, 1500); // Delay 1.5s so chat shows properly
+  }
+});
 
+bot.on('playerLeft', (player) => {
+  if (player.username !== bot.username && !recentLeaves.has(player.username)) {
+    recentLeaves.add(player.username);
+    setTimeout(() => {
+      bot.chat(`yela babaii ${player.username} i wil mis u bebeh forevah`);
+      setTimeout(() => recentLeaves.delete(player.username), 5000);
+    }, 1500); // Delay 1.5s
+  }
+});
+  
   bot.on('end', () => {
     console.log("❌ Disconnected. Reconnecting in 90 seconds...");
     setTimeout(createBot, 90000);
