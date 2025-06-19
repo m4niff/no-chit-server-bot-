@@ -17,7 +17,7 @@ function createBot() {
   bot.on('spawn', () => {
     console.log('✅ Bot joined');
 
-    // Safe movement to avoid idle kick
+    // 👟 Anti-idle movement
     jumpInterval = setInterval(() => {
       if (!bot || typeof bot.setControlState !== 'function') return;
       bot.setControlState('jump', true);
@@ -26,10 +26,9 @@ function createBot() {
       }, 500);
     }, 10000);
 
-    
-    // 💬 AFK chat messages
+    // 💬 Chatting AFK messages
     const messages = [
-        "where the fuck am i tf?",
+      "where the fuck am i tf?",
       "pahal aku teperangkap anjj",
       "lepaskan saya lepaskan sayaa saya ketua lanun",
       "oh shi aku lupa aku hanyalah robot hm",
@@ -67,14 +66,15 @@ function createBot() {
       "kalaulah aku bleh main ngan korg hm",
       "SAYA ULANGGG!!!"
     ];
+
     let index = 0;
-    setInterval(() => {
-      bot.chat(messages[index]);
+    chatInterval = setInterval(() => {
+      if (bot) bot.chat(messages[index]);
       index = (index + 1) % messages.length;
     }, 90000);
   });
 
-  // 👥 Join/Leave messages
+  // 👋 Join/Leave messages
   const recentJoins = new Set();
   const recentLeaves = new Set();
 
@@ -82,7 +82,7 @@ function createBot() {
     if (player.username !== bot.username && !recentJoins.has(player.username)) {
       recentJoins.add(player.username);
       setTimeout(() => {
-        bot.chat(`weyyy ${player.username} dah masuk piwitt Hi, I have autism too! Sending hugs!`);
+        if (bot) bot.chat(`weyyy ${player.username} dah masuk piwitt Hi, I have autism too! Sending hugs!`);
         setTimeout(() => recentJoins.delete(player.username), 5000);
       }, 1500);
     }
@@ -92,34 +92,35 @@ function createBot() {
     if (player.username !== bot.username && !recentLeaves.has(player.username)) {
       recentLeaves.add(player.username);
       setTimeout(() => {
-        bot.chat(`yela babaii ${player.username} i wil mis u bebeh forevah`);
+        if (bot) bot.chat(`yela babaii ${player.username} i wil mis u bebeh forevah`);
         setTimeout(() => recentLeaves.delete(player.username), 5000);
       }, 1500);
     }
   });
 
-  // 🔁 Auto reconnect
-  bot.on('end', () => {
-    console.log("❌ Disconnected. Reconnecting in 90 seconds...");
-    setTimeout(createBot, 90000);
-  });
-
-  bot.on('error', err => {
-    console.log("⚠️ Error:", err.message);
+  // 🔁 Auto-reconnect
+  function reconnect() {
+    clearInterval(jumpInterval);
+    clearInterval(chatInterval);
+    bot = null;
     console.log("🔄 Reconnecting in 90 seconds...");
     setTimeout(createBot, 90000);
-  });
+  }
 
+  bot.on('end', reconnect);
+  bot.on('error', (err) => {
+    console.log("⚠️ Error:", err.message);
+    reconnect();
+  });
   bot.on('kicked', (reason) => {
     console.log("🚫 Bot was kicked:", reason);
-    console.log("🔄 Reconnecting in 90 seconds...");
-    setTimeout(createBot, 90000);
+    reconnect();
   });
 }
 
 createBot();
 
-// 🌐 Express keep-alive (for uptime sites like BetterUptime)
+// 🌐 Keep server alive
 const app = express();
 app.get("/", (req, res) => res.send("Bot is running"));
 app.listen(3000, () => console.log("🌐 Express server active on port 3000"));
