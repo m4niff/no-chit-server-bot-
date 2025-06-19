@@ -1,3 +1,6 @@
+const mineflayer = require('mineflayer'); // ✅ required for bot to work
+const express = require('express');
+
 let bot = null; // <-- Global reference
 
 function createBot() {
