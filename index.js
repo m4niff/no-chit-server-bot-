@@ -13,17 +13,13 @@ function createBot() {
   bot.on('spawn', () => {
     console.log('✅ Bot joined');
 
-    bot.on('playerLeft', (player) => {
-      if (player.username !== bot.username) {
-        bot.chat(`yela babaii ${player.username}`);
-      }
-    });
-
+    // AFK Movement
     setInterval(() => {
       bot.setControlState('jump', true);
       setTimeout(() => bot.setControlState('jump', false), 500);
     }, 10000);
 
+    // AFK Chat
     const messages = [
       "where the fuck am i tf?",
       "pahal aku teperangkap anjj",
@@ -66,6 +62,23 @@ function createBot() {
       bot.chat(messages[index]);
       index = (index + 1) % messages.length;
     }, 90000);
+
+    // Detect join/leave messages via chat
+    bot.on('message', (jsonMsg) => {
+      const msg = jsonMsg.toString();
+      const matchJoin = msg.match(/^(\w+) joined the game$/);
+      const matchLeave = msg.match(/^(\w+) left the game$/);
+
+      if (matchJoin) {
+        const name = matchJoin[1];
+        if (name !== 'messi') bot.chat(`weyyy ${name} dah masukk piwittHi, I have autism too! It’s so nice for someone to raise awareness about our condition. Sending hugs!`);
+      }
+
+      if (matchLeave) {
+        const name = matchLeave[1];
+        if (name !== 'messi') bot.chat(`yela babaii ${name} i miss you bebeh`);
+      }
+    });
   });
 
   bot.on('end', () => {
