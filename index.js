@@ -13,8 +13,7 @@ function createBot() {
     version: "1.12.1",
     keepAlive: false
   });
-
-  bot.on('spawn', () => {
+  
   bot.on('spawn', () => {
   console.log('✅ Bot joined');
 
