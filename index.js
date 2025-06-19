@@ -17,14 +17,15 @@ function createBot() {
   bot.on('spawn', () => {
     console.log('✅ Bot joined');
 
-    // Random movement (jumping)
+    // Safe movement to avoid idle kick
     jumpInterval = setInterval(() => {
-      if (!bot || !bot.setControlState) return;
+      if (!bot || typeof bot.setControlState !== 'function') return;
       bot.setControlState('jump', true);
       setTimeout(() => {
         if (bot) bot.setControlState('jump', false);
       }, 500);
     }, 10000);
+
     
     // 💬 AFK chat messages
     const messages = [
