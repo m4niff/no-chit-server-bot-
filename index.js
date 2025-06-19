@@ -1,47 +1,29 @@
 const mineflayer = require('mineflayer');
 const express = require('express');
 
-// Start web server to prevent Render from sleeping
-const app = express();
-app.get("/", (req, res) => res.send("Bot is running"));
-app.listen(3000, () => console.log("🌐 Express server active on port 3000"));
-
 function createBot() {
   const bot = mineflayer.createBot({
     host: "skibidimustard.aternos.me",
     port: 19470,
     username: "messi",
     version: "1.12.1",
-    keepAlive: true
+    keepAlive: false
   });
 
   bot.on('spawn', () => {
     console.log('✅ Bot joined');
 
-    // Movement directions
-    const directions = ['forward', 'back', 'left', 'right'];
+    bot.on('playerLeft', (player) => {
+      if (player.username !== bot.username) {
+        bot.chat(`yela babaii ${player.username}`);
+      }
+    });
 
-    // Walk randomly
-    setInterval(() => {
-      const dir = directions[Math.floor(Math.random() * directions.length)];
-      bot.setControlState(dir, true);
-      setTimeout(() => bot.setControlState(dir, false), 1500 + Math.random() * 1500);
-    }, 15000); // Every 15 sec
-
-    // Random look around
-    setInterval(() => {
-      const yaw = Math.random() * 2 * Math.PI;
-      const pitch = Math.random() * Math.PI - (Math.PI / 2);
-      bot.look(yaw, pitch, true);
-    }, 12000);
-
-    // Jump occasionally
     setInterval(() => {
       bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 400);
+      setTimeout(() => bot.setControlState('jump', false), 500);
     }, 10000);
 
-    // Chat every 90 seconds
     const messages = [
       "where the fuck am i tf?",
       "pahal aku teperangkap anjj",
@@ -54,22 +36,36 @@ function createBot() {
       "man ko un sme man stfu aq tk tipu ni wt aq baran gile af like icl ts pmo sm hg ptut senyp sybau like bro ts sgt kevin",
       "SHOW ME YO WILLYYYYY",
       "apa ko aku bukan yatim",
+      "blablablbelbelbleblulbu",
       "ahhhh yes king",
       "sunyi siak",
       "MUSTARRRRRRRDDDDDDDD",
+      "setiap pendosa pasti taubat..dengan itu cukuplah menyebut dosa orang kerana anda juga mempunyai dosa tetapi Allah menutup aibmu.",
+      "because he kno how tu play futbal more than ronaldo",
+      "how gud is that dihh yes king auhghh",
       "sat berak sat",
+      "tkpe a tk jdi,kentut aja",
+      "asal korg senyap ja",
+      "WOIIIII TK LARAT NI WE",
+      "sedar tk sedar pada satu hari nanti kita tidak jumpa lagi jadi bermainlah selagi ada masa",
+      "sybau",
+      "stecu stecu stelan cuek baru malu aduh adik ini mw juga abang yang rayu",
       "kalau harini menanggg!! gloryglory man unitedddd",
+      "said im fine said i move on",
       "aku selalu tersenyummmm",
+      "nampak bosan kan? tapi game chat ni bole buat kita pejamkan mata dan bayangkan muka iman",
+      "AUFFUDUDHDUDH SAKIT KEPALA AKU WIWOWUFJWOCBWOCJDOF TOLONG AKUH",
       "SubhanAllah Alhamdulillah AstagfiruAllah Lailaha ilallah Allahu Akbar",
       "taubat ygy",
       "kalaulah aku bleh main ngan korg hm",
       "SAYA ULANGGG!!!"
     ];
+
     let index = 0;
     setInterval(() => {
       bot.chat(messages[index]);
       index = (index + 1) % messages.length;
-    }, 90000); // 90 seconds
+    }, 90000);
   });
 
   bot.on('end', () => {
@@ -91,3 +87,7 @@ function createBot() {
 }
 
 createBot();
+
+const app = express();
+app.get("/", (req, res) => res.send("Bot is running"));
+app.listen(3000, () => console.log("🌐 Express server active on port 3000"));
