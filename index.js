@@ -1,59 +1,31 @@
-const mineflayer = require('mineflayer'); // ✅ required for bot to work
+const mineflayer = require('mineflayer');
 const express = require('express');
 
-let bot = null; // <-- Global reference
+let bot;
+let jumpInterval;
+let chatInterval;
 
 function createBot() {
-  if (bot) return; // Prevent duplicate creation
-
   bot = mineflayer.createBot({
     host: "skibidimustard.aternos.me",
     port: 19470,
     username: "messi",
-    version: "1.12.1"
-  });
-
-  // reset bot variable when disconnected
-  bot.on('end', () => {
-    console.log("❌ Bot disconnected. Reconnecting in 90s...");
-    bot = null;
-    setTimeout(createBot, 90000);
-  });
-
-  bot.on('error', (err) => {
-    console.log("⚠️ Error:", err.message);
-    bot = null;
-    setTimeout(createBot, 90000);
-  });
-
-  bot.on('kicked', (reason) => {
-    console.log("🚫 Bot kicked:", reason);
-    bot = null;
-    setTimeout(createBot, 90000);
+    version: "1.12.1",
+    keepAlive: false
   });
 
   bot.on('spawn', () => {
     console.log('✅ Bot joined');
 
-    // 🧠 Realistic movement: walk + rotate + jump
-    setInterval(() => {
-      const directions = ['forward', 'back', 'left', 'right'];
-      const dir = directions[Math.floor(Math.random() * directions.length)];
-
-      bot.setControlState(dir, true);
+    // Random movement (jumping)
+    jumpInterval = setInterval(() => {
+      if (!bot || !bot.setControlState) return;
       bot.setControlState('jump', true);
-
-      // Random head rotation
-      const yaw = Math.random() * Math.PI * 2; // 0 to 360°
-      const pitch = (Math.random() - 0.5) * 0.5; // slight up/down
-      bot.look(yaw, pitch, true);
-
       setTimeout(() => {
-        bot.setControlState(dir, false);
-        bot.setControlState('jump', false);
-      }, 1000); // Move for 1s
-    }, 12000); // Every 12s
-
+        if (bot) bot.setControlState('jump', false);
+      }, 500);
+    }, 10000);
+    
     // 💬 AFK chat messages
     const messages = [
         "where the fuck am i tf?",
