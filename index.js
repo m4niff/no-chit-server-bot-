@@ -1,12 +1,32 @@
-const mineflayer = require('mineflayer');
-const express = require('express');
+let bot = null; // <-- Global reference
 
 function createBot() {
-  const bot = mineflayer.createBot({
+  if (bot) return; // Prevent duplicate creation
+
+  bot = mineflayer.createBot({
     host: "skibidimustard.aternos.me",
     port: 19470,
     username: "messi",
     version: "1.12.1"
+  });
+
+  // reset bot variable when disconnected
+  bot.on('end', () => {
+    console.log("❌ Bot disconnected. Reconnecting in 90s...");
+    bot = null;
+    setTimeout(createBot, 90000);
+  });
+
+  bot.on('error', (err) => {
+    console.log("⚠️ Error:", err.message);
+    bot = null;
+    setTimeout(createBot, 90000);
+  });
+
+  bot.on('kicked', (reason) => {
+    console.log("🚫 Bot kicked:", reason);
+    bot = null;
+    setTimeout(createBot, 90000);
   });
 
   bot.on('spawn', () => {
