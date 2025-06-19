@@ -15,17 +15,50 @@ function createBot() {
   });
 
   bot.on('spawn', () => {
-    console.log('✅ Bot joined');
+  bot.on('spawn', () => {
+  console.log('✅ Bot joined');
 
-    // 👟 Anti-idle movement
-    jumpInterval = setInterval(() => {
-      if (!bot || typeof bot.setControlState !== 'function') return;
+  // 🔁 Force survival mode if in spectator
+  if (bot.game.gameMode !== 'survival') {
+    bot.chat('/gamemode survival');
+  }
+
+  // 🔄 Move forward randomly every few seconds
+  let directions = ['forward', 'back', 'left', 'right'];
+  setInterval(() => {
+    if (!bot || !bot.setControlState) return;
+    let dir = directions[Math.floor(Math.random() * directions.length)];
+    bot.setControlState(dir, true);
+    setTimeout(() => bot.setControlState(dir, false), 1000);
+  }, 15000);
+
+  // 🌙 Sleep at night if bed is nearby
+  setInterval(() => {
+    if (!bot.time || !bot.entity) return;
+    if (bot.time.isNight) {
+      const bed = bot.findBlock({
+        matching: block => bot.isABed(block),
+        maxDistance: 16
+      });
+
+      if (bed) {
+        bot.sleep(bed).then(() => {
+          console.log("🛏️ Bot is sleeping");
+        }).catch(err => {
+          console.log("⚠️ Sleep failed:", err.message);
+        });
+      }
+    }
+  }, 20000);
+
+  // ✅ Still jump every 10s to be safe
+  setInterval(() => {
+    if (bot && bot.setControlState) {
       bot.setControlState('jump', true);
-      setTimeout(() => {
-        if (bot) bot.setControlState('jump', false);
-      }, 500);
-    }, 10000);
-
+      setTimeout(() => bot.setControlState('jump', false), 500);
+    }
+  }, 10000);
+});
     // 💬 Chatting AFK messages
     const messages = [
       "where the fuck am i tf?",
