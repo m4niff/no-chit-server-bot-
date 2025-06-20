@@ -32,24 +32,27 @@ function createBot() {
       }
     }, 10000);
 
-    // ✅ Sleep if it's night and bed is nearby
-    setInterval(() => {
-      if (!bot.time || !bot.entity) return;
-      if (bot.time.isNight) {
-        const bed = bot.findBlock({
-          matching: block => bot.isABed(block),
-          maxDistance: 16
-        });
+  // ✅ Sleep if it's night and bed is nearby
+setInterval(() => {
+  if (!bot.time || !bot.entity) return;
 
-        if (bed) {
-          bot.sleep(bed).then(() => {
-            console.log("🛏️ nacak...");
-          }).catch(err => {
-            console.log("⚠️ Sleep failed:", err.message);
-          });
-        }
-      }
-    }, 20000);
+  if (bot.time.isNight) {
+    const bed = bot.findBlock({
+      matching: block => bot.isABed(block),
+      maxDistance: 16
+    });
+
+    if (bed) {
+      bot.sleep(bed).then(() => {
+        console.log("🛏️ nacak...");
+        bot.chat("tido la gile"); // 💤 Send chat when sleeping
+      }).catch(err => {
+        console.log("⚠️ Sleep failed:", err.message);
+      });
+    }
+  }
+}, 20000);
+
 
     // ✅ Chat loop
     const messages = [
