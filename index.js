@@ -1,4 +1,5 @@
 const mineflayer = require('mineflayer');
+const { pathfinder, Movements, goals: { GoalBlock } } = require('mineflayer-pathfinder');
 const express = require('express');
 
 let bot;
@@ -12,7 +13,12 @@ function createBot() {
     keepAlive: false
   });
 
-  bot.on('spawn', () => {
+  bot.once('spawn', () => {
+    bot.loadPlugin(pathfinder);
+    const mcData = require('minecraft-data')(bot.version);
+    const defaultMove = new Movements(bot, mcData);
+    bot.pathfinder.setMovements(defaultMove);
+
     console.log('✅ Bot joined');
 
     // ✅ Random movement to avoid idle
@@ -32,26 +38,37 @@ function createBot() {
       }
     }, 10000);
 
-  // ✅ Sleep if it's night and bed is nearby
-setInterval(() => {
-  if (!bot.time || !bot.entity) return;
+    // ✅ Look around randomly
+    setInterval(() => {
+      const yaw = (Math.random() - 0.5) * Math.PI * 2;
+      const pitch = (Math.random() - 0.5) * Math.PI / 2;
+      bot.look(yaw, pitch, true);
+    }, 8000);
 
-  if (bot.time.isNight) {
-    const bed = bot.findBlock({
-      matching: block => bot.isABed(block),
-      maxDistance: 16
-    });
+    // ✅ Sleep if it's night and bed is nearby
+    setInterval(() => {
+      if (!bot.time || !bot.entity) return;
 
-    if (bed) {
-      bot.sleep(bed).then(() => {
-        console.log("🛏️ nacak...");
-        bot.chat("tido la gile"); // 💤 Send chat when sleeping
-      }).catch(err => {
-        console.log("⚠️ Sleep failed:", err.message);
-      });
-    }
-  }
-}, 20000);
+      if (bot.time.isNight && !bot.isSleeping) {
+        const bed = bot.findBlock({
+          matching: block => bot.isABed(block),
+          maxDistance: 16
+        });
+
+        if (bed) {
+          bot.pathfinder.setGoal(new GoalBlock(bed.position.x, bed.position.y, bed.position.z));
+
+          setTimeout(() => {
+            bot.sleep(bed).then(() => {
+              console.log("🛏️ nacak...");
+              bot.chat("tido la gile");
+            }).catch(err => {
+              console.log("⚠️ Sleep failed:", err.message);
+            });
+          }, 5000); // Give it time to walk to bed
+        }
+      }
+    }, 20000);
 
 
     // ✅ Chat loop
@@ -126,7 +143,7 @@ bot.on('playerLeft', (player) => {
 });
 
 
-  // ✅ Reconnect on kick or end
+  // ✅ Reconnect on error
   bot.on('end', () => {
     console.log("❌ Disconnected. Reconnecting in 90 seconds...");
     setTimeout(createBot, 90000);
@@ -134,13 +151,11 @@ bot.on('playerLeft', (player) => {
 
   bot.on('error', err => {
     console.log("⚠️ Error:", err.message);
-    console.log("🔄 Reconnecting in 90 seconds...");
     setTimeout(createBot, 90000);
   });
 
   bot.on('kicked', reason => {
     console.log("🚫 Bot was kicked:", reason);
-    console.log("🔄 Reconnecting in 90 seconds...");
     setTimeout(createBot, 90000);
   });
 }
