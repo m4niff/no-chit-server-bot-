@@ -45,30 +45,29 @@ function createBot() {
       bot.look(yaw, pitch, true);
     }, 8000);
 
-    // ✅ Sleep if it's night and bed is nearby
-    setInterval(() => {
-      if (!bot.time || !bot.entity) return;
+  // ✅ Simple sleep: click bed if night
+setInterval(() => {
+  if (!bot.time || !bot.entity) return;
 
-      if (bot.time.isNight && !bot.isSleeping) {
-        const bed = bot.findBlock({
-          matching: block => bot.isABed(block),
-          maxDistance: 16
+  if (bot.time.isNight && !bot.isSleeping) {
+    const bed = bot.findBlock({
+      matching: block => bot.isABed(block),
+      maxDistance: 6
+    });
+
+    if (bed) {
+      bot.lookAt(bed.position.offset(0.5, 0.5, 0.5), true, () => {
+        bot.sleep(bed).then(() => {
+          console.log("🛏️ Sleeping...");
+          bot.chat("tido la gile");
+        }).catch(err => {
+          console.log("⚠️ Couldn't sleep:", err.message);
         });
+      });
+    }
+  }
+}, 15000);
 
-        if (bed) {
-          bot.pathfinder.setGoal(new GoalBlock(bed.position.x, bed.position.y, bed.position.z));
-
-          setTimeout(() => {
-            bot.sleep(bed).then(() => {
-              console.log("🛏️ nacak...");
-              bot.chat("tido la gile");
-            }).catch(err => {
-              console.log("⚠️ Sleep failed:", err.message);
-            });
-          }, 5000); // Give it time to walk to bed
-        }
-      }
-    }, 20000);
 
 
     // ✅ Chat loop
