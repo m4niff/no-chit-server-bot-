@@ -66,7 +66,7 @@ setInterval(() => {
 setInterval(() => {
   if (bot.food < 20 || bot.health < 20) {
     const food = bot.inventory.items().find(item =>
-      item.name.includes('cooked') || item.name.includes('apple') || item.name.includes('bread')
+      item.name.includes('cooked_beef') || item.name.includes('apple') || item.name.includes('bread')
     );
     if (food) {
       bot.clearControlStates(); // Stop moving
