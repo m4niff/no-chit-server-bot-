@@ -43,7 +43,7 @@ function createBot() {
 
         if (bed) {
           bot.sleep(bed).then(() => {
-            console.log("🛏️ Sleeping...");
+            console.log("🛏️ nacak...");
           }).catch(err => {
             console.log("⚠️ Sleep failed:", err.message);
           });
@@ -98,29 +98,30 @@ function createBot() {
     }, 90000);
   });
 
-  // ✅ Join/Leave message
-  const recentJoins = new Set();
-  const recentLeaves = new Set();
+// ✅ Join/Leave message
+const recentJoins = new Set();
+const recentLeaves = new Set();
 
-  bot.on('playerJoined', (player) => {
-    if (player.username !== bot.username && !recentJoins.has(player.username)) {
-      recentJoins.add(player.username);
-      setTimeout(() => {
-        bot.chat(`weyyy ${player.username} dah masuk piwitt Hi, I have autism too! Sending hugs!`);
-        setTimeout(() => recentJoins.delete(player.username), 5000);
-      }, 1500);
-    }
-  });
+bot.on('playerJoined', (player) => {
+  if (player.username !== bot.username && !recentJoins.has(player.username)) {
+    recentJoins.add(player.username);
+    setTimeout(() => {
+      bot.chat(`weyyy ${player.username} dah masuk piwitt Hi, I have autism too! Sending hugs!`);
+      setTimeout(() => recentJoins.delete(player.username), 5000);
+    }, 5000); // ← change this delay (5s)
+  }
+});
 
-  bot.on('playerLeft', (player) => {
-    if (player.username !== bot.username && !recentLeaves.has(player.username)) {
-      recentLeaves.add(player.username);
-      setTimeout(() => {
-        bot.chat(`yela babaii ${player.username} i wil mis u bebeh forevah`);
-        setTimeout(() => recentLeaves.delete(player.username), 5000);
-      }, 1500);
-    }
-  });
+bot.on('playerLeft', (player) => {
+  if (player.username !== bot.username && !recentLeaves.has(player.username)) {
+    recentLeaves.add(player.username);
+    setTimeout(() => {
+      bot.chat(`yela babaii ${player.username} i wil mis u bebeh forevah`);
+      setTimeout(() => recentLeaves.delete(player.username), 5000);
+    }, 5000); // ← change this delay (5s)
+  }
+});
+
 
   // ✅ Reconnect on kick or end
   bot.on('end', () => {
