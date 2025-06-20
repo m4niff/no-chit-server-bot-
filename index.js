@@ -41,34 +41,43 @@ function createBot() {
       bot.look(yaw, pitch, true);
     }, 8000);
 
-    // 🗡️ Auto attack nearby hostile mobs
-    setInterval(() => {
-      const mob = bot.nearestEntity(e =>
-        e.type === 'mob' &&
-        e.position.distanceTo(bot.entity.position) < 10 &&
-        ['zombie', 'skeleton', 'spider', 'creeper', 'enderman'].includes(e.name)
-      );
-      if (mob) {
-        bot.lookAt(mob.position.offset(0, mob.height, 0));
-        bot.attack(mob);
-        console.log(`⚔️ Attacking ${mob.name}`);
-      }
-    }, 2000);
+// 🗡️ Hunt & attack hostile mobs
+setInterval(() => {
+  const hostile = bot.nearestEntity(e =>
+    e.type === 'mob' &&
+    e.isValid &&
+    ['zombie', 'skeleton', 'spider', 'creeper', 'enderman'].includes(e.name)
+  );
 
-    // 🍗 Heal when hurt
-    setInterval(() => {
-      if (bot.food < 20 && bot.health < 20) {
-        const foodItem = bot.inventory.items().find(item =>
-          item.name.includes('cooked') || item.name.includes('apple') || item.name.includes('bread')
-        );
-        if (foodItem) {
-          bot.equip(foodItem, 'hand').then(() => {
-            bot.consume().catch(() => {});
-            console.log('🍗 Eating food...');
-          }).catch(() => {});
-        }
-      }
-    }, 5000);
+  if (hostile) {
+    const distance = bot.entity.position.distanceTo(hostile.position);
+    if (distance > 3) {
+      bot.pathfinder.setGoal(new GoalFollow(hostile, 2));
+    } else {
+      bot.lookAt(hostile.position.offset(0, hostile.height, 0)).then(() => {
+        bot.attack(hostile);
+        console.log(`⚔️ Attacking ${hostile.name}`);
+      });
+    }
+  }
+}, 2500);
+
+// 🍗 Auto-heal when hungry or hurt
+setInterval(() => {
+  if (bot.food < 20 || bot.health < 20) {
+    const food = bot.inventory.items().find(item =>
+      item.name.includes('cooked') || item.name.includes('apple') || item.name.includes('bread')
+    );
+    if (food) {
+      bot.clearControlStates(); // Stop moving
+      bot.equip(food, 'hand').then(() => {
+        bot.consume().then(() => {
+          console.log('🍗 Healed: eating food...');
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+  }
+}, 7000);
 
 
 
