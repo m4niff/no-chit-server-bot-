@@ -84,6 +84,8 @@ setInterval(() => {
     // ✅ Chat loop
     const messages = [
        "where the fuck am i tf?",
+      "woiii harini birthday mirul hadif ka"
+      "mat hari jadi amirol doggy baby"
       "piwit boleh bunuh zombie bagai siottt",
       "lepasni aq jdi bodygard korg yehaww",
       "bising bdo karina",
