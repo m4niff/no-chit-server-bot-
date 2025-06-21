@@ -93,6 +93,7 @@ setInterval(() => {
       "boikot perempuan nme sofea pantek jubo lahanat",
       "bising do bal",
       "man ko un sme man stfu aq tk tipu ni wt aq baran gile af like icl ts pmo sm hg ptut senyp sybau like bro ts sgt kevin",
+      "ma bad ma bad ma fault²",
       "SHOW ME YO WILLYYYYY",
       "apa ko aku bukan yatim",
       "blablablbelbelbleblulbu",
