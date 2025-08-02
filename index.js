@@ -19,18 +19,17 @@ bot.loadPlugin(pathfinder);
 let defaultMove;
 let following = false;
 
-// When bot spawns
 bot.once('spawn', () => {
-  defaultMove = new Movements(bot); // ✅ Use without "const"
+  defaultMove = new Movements(bot, bot.registry); // Only works after spawn!
   defaultMove.allowSprinting = true;
   defaultMove.canDig = false;
+  defaultMove.scafoldingBlocks = [];
   defaultMove.blocksToAvoid.add(8); // Water
   defaultMove.blocksToAvoid.add(9); // Flowing water
 
   bot.pathfinder.setMovements(defaultMove);
-  console.log('🤖 Bot has spawned and is ready');
+  console.log("✅ Bot spawned and movement system initialized!");
 });
-
 
 // Error handling
 bot.on('error', err => console.error('❌ Bot error:', err));
