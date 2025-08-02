@@ -5,14 +5,6 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Express web server to keep bot alive
-app.get('/', (req, res) => {
-  res.send('Bot is running');
-});
-app.listen(port, () => {
-  console.log(🌐 Express server active on port ${port});
-});
-
 // Create the bot
 const bot = mineflayer.createBot({
   host: 'neymar.aternos.me',
