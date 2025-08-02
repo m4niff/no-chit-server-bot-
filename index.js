@@ -174,45 +174,6 @@ bot.on('health', () => {
       bot.look(yaw, pitch, true);
     }, 8000);
 
-// 🗡️ Hunt & attack hostile mobs
-setInterval(() => {
-  const hostile = bot.nearestEntity(e =>
-    e.type === 'mob' &&
-    e.isValid &&
-    ['zombie', 'skeleton', 'spider', 'creeper', 'enderman'].includes(e.name)
-  );
-
-  if (hostile) {
-    const distance = bot.entity.position.distanceTo(hostile.position);
-    if (distance > 3) {
-      bot.pathfinder.setGoal(new GoalFollow(hostile, 2));
-    } else {
-      bot.lookAt(hostile.position.offset(0, hostile.height, 0)).then(() => {
-        bot.attack(hostile);
-        console.log(⚔️ Attacking ${hostile.name});
-      });
-    }
-  }
-}, 2500);
-
-// 🍗 Auto-heal when hungry or hurt
-setInterval(() => {
-  if (bot.food < 20 || bot.health < 20) {
-    const food = bot.inventory.items().find(item =>
-      item.name.includes('cooked_beef') || item.name.includes('apple') || item.name.includes('bread')
-    );
-    if (food) {
-      bot.clearControlStates(); // Stop moving
-      bot.equip(food, 'hand').then(() => {
-        bot.consume().then(() => {
-          console.log('🍗 Healed: eating food...');
-        }).catch(() => {});
-      }).catch(() => {});
-    }
-  }
-}, 7000);
-
-
 
     // ✅ Chat loop
     const messages = [
