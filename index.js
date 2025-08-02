@@ -23,7 +23,7 @@ const hitMessages = [
 ];
 
 const dangerMessages = [
-  'tenggelam siakkkk', 'bakar hidup hidup??', 'tolong panas gila', 'aku lemas dowhhh'
+  'tolong akuh'
 ];
 
 // 🟢 On spawn
