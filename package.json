@@ -10,6 +10,3 @@
     "mineflayer": "^4.5.0"
   }
 }
-git add package.json
-git commit -m "Fix: use mineflayer 4.5.0 for Minecraft 1.20.1 support"
-git push
