@@ -31,45 +31,6 @@ bot.once('spawn', () => {
   console.log('🤖 Bot has spawned and is ready');
 });
 
-// Chat commands
-bot.on('chat', (username, message) => {
-  if (username === bot.username) return;
-
-  const msg = message.toLowerCase();
-
-  if (msg === 'woi ikut aq') {
-    const player = bot.players[username]?.entity;
-   const defaultMove = new Movements(bot, bot.registry)
-      bot.chat("mana hang?");
-      return;
-    }
-
-    bot.chat('jap ah aku ikut hang');
-    following = true;
-    followPlayer(player);
-  }
-
-  if (msg === 'stop') {
-    bot.chat('baik ah aku stop');
-    following = false;
-    bot.pathfinder.setGoal(null);
-  }
-});
-
-// Follow logic
-function followPlayer(player) {
-  if (!player) return;
-
-  const interval = setInterval(() => {
-    if (!following || !player.isValid) {
-      clearInterval(interval);
-      return;
-    }
-
-    const goal = new goals.GoalFollow(player, 1);
-    bot.pathfinder.setGoal(goal, true);
-  }, 1000);
-}
 
 // Error handling
 bot.on('error', err => console.error('❌ Bot error:', err));
