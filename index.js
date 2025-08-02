@@ -39,7 +39,7 @@ bot.on('chat', (username, message) => {
 
   if (msg === 'woi ikut aq') {
     const player = bot.players[username]?.entity;
-    if (!player) {
+   const defaultMove = new Movements(bot, bot.registry)
       bot.chat("mana hang?");
       return;
     }
