@@ -107,7 +107,7 @@ const dangerMessages = [
 ];
 
 // Avoid water by customizing movements
-const defaultMove = new Movements(bot);
+defaultMove = new Movements(bot);
 defaultMove.scafoldingBlocks = []; // prevent climbing
 defaultMove.allowSprinting = true;
 defaultMove.canDig = false;
