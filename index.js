@@ -147,4 +147,51 @@ setInterval(() => {
   if (!bot.entity) return;
   const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
   const pitch = (Math.random() - 0.5) * Math.PI / 4;
-  bot.look(yaw,
+  bot.look(yaw, pitch, true);
+}, 8000);
+
+// Random chat
+const messages = [
+  "mne iman my love",
+  "kaya siak server baru",
+  "piwit boleh bunuh zombie bagai siottt",
+  "lepasni aq jdi bodygard korg yehaww",
+  "what the fuck why asal tkde zombi monster bagai???",
+  "bising bdo karina",
+  "amirul hadif x nurul iman very very sweet good",
+  "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
+  "duatiga duatiga dua empat",
+  "boikot perempuan nme sofea pantek jubo lahanat",
+  "bising do bal",
+  "sat berak sat",
+  "sunyi siak",
+  "MUSTARRRRRRRDDDDDDDD",
+  "ok aq ulang blik dri awal"
+];
+let index = 0;
+setInterval(() => {
+  bot.chat(messages[index]);
+  index = (index + 1) % messages.length;
+}, 90000);
+
+// Auto reconnect
+function createBot() {
+  require('child_process').spawn('node', ['index.js'], {
+    stdio: 'inherit'
+  });
+}
+
+bot.on('end', () => {
+  console.log("❌ Disconnected. Reconnecting in 90 seconds...");
+  setTimeout(createBot, 90000);
+});
+
+bot.on('error', err => {
+  console.log("⚠️ Error:", err.message);
+  setTimeout(createBot, 90000);
+});
+
+bot.on('kicked', reason => {
+  console.log("🚫 Bot was kicked:", reason);
+  setTimeout(createBot, 90000);
+});
