@@ -1,7 +1,6 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { GoalFollow } = goals;
-const { plugin: pvp } = require('mineflayer-pvp');
 const mcDataLoader = require('minecraft-data');
 
 let mcData;
@@ -17,7 +16,6 @@ function createBot() {
   });
 
   bot.loadPlugin(pathfinder);
-  bot.loadPlugin(pvp);
 
   let defaultMove;
   let lastHealth = 20;
@@ -71,7 +69,16 @@ function createBot() {
         bot.chat(`bunuh ${target.mobType} jap`);
       } catch (e) {}
 
-      bot.pvp.attack(target);
+      const attackInterval = setInterval(() => {
+        if (!target?.isValid || !bot.entity) {
+          clearInterval(attackInterval);
+          return;
+        }
+
+        if (bot.entity.position.distanceTo(target.position) < 3) {
+          bot.attack(target);
+        }
+      }, 800);
     }
   }
 
@@ -84,7 +91,8 @@ function createBot() {
       reacting = true;
 
       const attacker = bot.nearestEntity(e =>
-        e.type === 'player' || e.type === 'mob'
+        e.type === 'mob' &&
+        ['Zombie', 'Drowned', 'Creeper', 'Skeleton', 'Spider'].includes(e.mobType)
       );
 
       const isDrowning = bot.entity.isInWater;
@@ -100,10 +108,21 @@ function createBot() {
 
       if (attacker && attacker.position) {
         equipWeapon();
-        bot.pvp.attack(attacker);
+
+        const attackLoop = setInterval(() => {
+          if (!attacker?.isValid) {
+            clearInterval(attackLoop);
+            reacting = false;
+            return;
+          }
+
+          if (bot.entity.position.distanceTo(attacker.position) < 3) {
+            bot.attack(attacker);
+          }
+        }, 800);
 
         setTimeout(() => {
-          bot.pvp.stop();
+          clearInterval(attackLoop);
           reacting = false;
         }, 5000);
       } else {
