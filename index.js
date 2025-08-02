@@ -8,7 +8,7 @@ let mcData;
 const bot = mineflayer.createBot({
   host: 'neymar.aternos.me',
   port: 48991,
-  username: 'messi'
+  username: 'ronaldinho'
 });
 
 bot.loadPlugin(pathfinder);
@@ -19,7 +19,7 @@ let reacting = false;
 
 const hitMessages = [
   'suda cukup cukup suda', 'AWAWAW', 'sok asik', 'weh ko ni',
-  'apasal pukul aku', 'ko ni bodoh ka'
+  'apasal pukul aku',
 ];
 
 const dangerMessages = [
@@ -124,7 +124,7 @@ setInterval(() => {
 
 // 💬 Random chatting
 const messages = [
-  "where the fuck am i tf?",
+  "mne iman my love",
   "kaya siak server baru",
   "piwit boleh bunuh zombie bagai siottt",
   "lepasni aq jdi bodygard korg yehaww",
