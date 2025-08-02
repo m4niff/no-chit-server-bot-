@@ -13,58 +13,67 @@ function createBot() {
     keepAlive: false
   });
 
-  bot.once('spawn', () => {
-    console.log('✅ Bot joined');
-    bot.loadPlugin(pathfinder);
-    const mcData = require('minecraft-data')(bot.version);
-    const defaultMove = new Movements(bot, mcData);
-    bot.pathfinder.setMovements(defaultMove);
-    let lastHealth = 20;
-let lastHitTime = 0;
+ 
+// Web server to keep Render alive
+app.get('/', (req, res) => res.send('Bot is running'));
+app.listen(3000, () => console.log('🌐 Express server active'));
 
-bot.on('spawn', () => {
+bot.loadPlugin(pathfinder);
+
+let lastHealth = 20;
+let chasing = false;
+
+bot.once('spawn', () => {
+  const defaultMove = new Movements(bot);
+  bot.pathfinder.setMovements(defaultMove);
   console.log('🤖 Bot has spawned');
 });
 
-bot.on('health', () => {
-  const now = Date.now();
-  if (bot.health < lastHealth && now - lastHitTime > 5000) {
-    lastHitTime = now;
+bot.on('health', async () => {
+  const nowHealth = bot.health;
 
-    // Send chat message after getting hit
-    bot.chat('sakit la babi');
-
-    // Attack nearby player (not the bot itself)
+  if (nowHealth < lastHealth && !chasing) {
     const attacker = bot.nearestEntity(entity =>
       entity.type === 'player' &&
       entity.username !== bot.username &&
-      entity.position.distanceTo(bot.entity.position) < 5
+      entity.position.distanceTo(bot.entity.position) < 10
     );
 
     if (attacker) {
-      bot.lookAt(attacker.position.offset(0, attacker.height, 0), true).then(() => {
-        bot.attack(attacker);
-        console.log(`🗡️ Retaliating against ${attacker.username}`);
-      }).catch(() => {});
-    } else {
-      // Fallback: attack hostile mobs (optional)
-      const mobAttacker = bot.nearestEntity(e =>
-        e.type === 'mob' &&
-        ['zombie', 'skeleton', 'spider', 'creeper'].includes(e.name) &&
-        e.position.distanceTo(bot.entity.position) < 5
-      );
+      chasing = true;
+      bot.chat('sakit la babi');
 
-      if (mobAttacker) {
-        bot.lookAt(mobAttacker.position.offset(0, mobAttacker.height, 0), true).then(() => {
-          bot.attack(mobAttacker);
-          console.log(`🗡️ Retaliating against ${mobAttacker.name}`);
-        }).catch(() => {});
+      try {
+        await bot.lookAt(attacker.position.offset(0, attacker.height, 0), true);
+        bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+
+        // Chase for 3 seconds
+        setTimeout(() => {
+          bot.pathfinder.setGoal(null);
+          walkAway();
+          chasing = false;
+        }, 3000);
+      } catch (e) {
+        console.log('Error looking at attacker:', e);
+        chasing = false;
       }
     }
   }
 
-  lastHealth = bot.health;
+  lastHealth = nowHealth;
 });
+
+function walkAway() {
+  const pos = bot.entity.position;
+  const dx = (Math.random() - 0.5) * 10;
+  const dz = (Math.random() - 0.5) * 10;
+
+  const walkX = pos.x + dx;
+  const walkZ = pos.z + dz;
+
+  bot.pathfinder.setGoal(new GoalNear(walkX, pos.y, walkZ, 1));
+  console.log('🚶 Walking away like nothing happened...');
+}
 
     // 🧠 Move randomly every few seconds
     const directions = ['forward', 'back', 'left', 'right'];
