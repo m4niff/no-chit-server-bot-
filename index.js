@@ -107,7 +107,8 @@ const dangerMessages = [
 ];
 
 // Avoid water by customizing movements
-defaultMove = new Movements(bot);
+const { Movements } = require('mineflayer-pathfinder');
+const defaultMove = new Movements(bot, bot.registry); // 
 defaultMove.scafoldingBlocks = []; // prevent climbing
 defaultMove.allowSprinting = true;
 defaultMove.canDig = false;
