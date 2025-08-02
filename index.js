@@ -26,13 +26,13 @@ const dangerMessages = [
 
 // 🔁 On bot spawn
 bot.once('spawn', () => {
-  const data = mcData(bot.version);
-  defaultMove = new Movements(bot, data);
+  mcData = mcDataLoader(bot.version);
+  defaultMove = new Movements(bot, mcData);
   defaultMove.scafoldingBlocks = [];
   defaultMove.allowSprinting = true;
   defaultMove.canDig = false;
-  defaultMove.blocksToAvoid.add(8);
-  defaultMove.blocksToAvoid.add(9);
+  defaultMove.blocksToAvoid.add(8); // Water
+  defaultMove.blocksToAvoid.add(9); // Flowing Water
 
   bot.pathfinder.setMovements(defaultMove);
   console.log('✅ Bot spawned, movements ready.');
@@ -84,7 +84,7 @@ bot.on('chat', (username, message) => {
     }
 
     const pos = player.entity.position;
-    bot.chat("baik tuan " + username);
+    bot.chat("ight" + username);
     bot.pathfinder.setGoal(new GoalNear(pos.x, pos.y, pos.z, 1));
   }
 });
