@@ -283,7 +283,6 @@ setInterval(() => {
     console.log("🚫 Bot was kicked:", reason);
     setTimeout(createBot, 90000);
   });
-}
 
 createBot();
 
