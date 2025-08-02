@@ -28,7 +28,6 @@ let lastHealth = 20;
 let reacting = false;
 
 const hitMessages = [
-  'sakit la babi',
   'suda cukup cukup suda',
   'AWAWAW',
   'sok asik',
@@ -83,21 +82,6 @@ bot.once('spawn', () => {
           if (bot.entity.position.distanceTo(attacker.position) < 4) {
             bot.attack(attacker);
           }
-
-          // Walk away like nothing happened
-          const awayVec = attacker.position.offset(Math.random() * 4 - 2, 0, Math.random() * 4 - 2);
-          bot.pathfinder.setGoal(new GoalNear(awayVec.x, awayVec.y, awayVec.z, 1));
-
-          reacting = false;
-        }, 3000);
-
-      }, 1000); // Delay before chasing
-    } else {
-      reacting = false;
-    }
-  }
-
-  lastHealth = bot.health;
 });
 
 
