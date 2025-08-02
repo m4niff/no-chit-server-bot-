@@ -13,17 +13,7 @@ function createBot() {
     keepAlive: false
   });
 
- 
-// 🟢 Web server to keep Render alive
-app.get('/', (req, res) => res.send('Bot is running'));
-app.listen(3000, () => console.log('🌐 Express server active'));
-
-bot.loadPlugin(pathfinder);
-
-let lastHealth = 20;
-let chasing = false;
-
-bot.once('spawn', () => {
+ bot.once('spawn', () => {
   const defaultMove = new Movements(bot);
   bot.pathfinder.setMovements(defaultMove);
   console.log('🤖 Bot has spawned');
