@@ -84,8 +84,7 @@ setInterval(() => {
     // ✅ Chat loop
     const messages = [
        "where the fuck am i tf?",
-      "kaya siak server baru"
-      "mirul doggy"
+      "kaya siak server baru",
       "piwit boleh bunuh zombie bagai siottt",
       "lepasni aq jdi bodygard korg yehaww",
       "what the fuck why asal tkde zombi monster bagai???",
