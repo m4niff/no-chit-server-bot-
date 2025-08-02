@@ -1,6 +1,6 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const { GoalFollow } = goals;
+const { GoalFollow, GoalNear } = goals;
 const mcDataLoader = require('minecraft-data');
 
 let mcData;
@@ -18,118 +18,69 @@ function createBot() {
   bot.loadPlugin(pathfinder);
 
   let defaultMove;
-  let lastHealth = 20;
-  let reacting = false;
   let botSpawned = false;
+  let lastHealth = 20;
 
-  const hitMessages = [
-    'suda cukup cukup suda', 'AWAWAW', 'sok asik', 'weh ko ni',
-    'apasal pukul aku',
-  ];
-
-  const dangerMessages = ['sakitnyo'];
+  const hostileMobs = ['Zombie', 'Drowned', 'Skeleton', 'Creeper', 'Spider'];
 
   bot.once('spawn', () => {
     botSpawned = true;
-
     mcData = mcDataLoader(bot.version);
     defaultMove = new Movements(bot, mcData);
-    defaultMove.scafoldingBlocks = [];
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
 
-    defaultMove.blocksToAvoid.add(8);
-    defaultMove.blocksToAvoid.add(9);
+    defaultMove.blocksToAvoid.add(8); // water
+    defaultMove.blocksToAvoid.add(9); // flowing water
 
     bot.pathfinder.setMovements(defaultMove);
-    console.log('✅ Bot spawned, movements ready.');
+    console.log("✅ Bot spawned and ready.");
   });
 
   function equipWeapon() {
-    const sword = bot.inventory.items().find(item => item.name.includes('sword'));
-    if (sword) {
-      bot.equip(sword, 'hand').catch(() => {});
+    const weapon = bot.inventory.items().find(item => item.name.includes('sword'));
+    if (weapon) {
+      bot.equip(weapon, 'hand').catch(() => {});
     }
   }
 
-  function attackNearbyHostiles() {
-    if (!botSpawned || !bot.entity || !bot.entities) return;
+  function attackHostile() {
+    if (!botSpawned || !bot.entity) return;
 
-    const hostiles = Object.values(bot.entities).filter(e =>
+    const mobs = Object.values(bot.entities).filter(e =>
       e.type === 'mob' &&
-      ['Drowned', 'Zombie', 'Skeleton', 'Creeper', 'Spider'].includes(e.mobType) &&
+      hostileMobs.includes(e.mobType) &&
       bot.entity.position.distanceTo(e.position) < 16
     );
 
-    if (hostiles.length > 0) {
-      const target = hostiles[0];
-      equipWeapon();
+    if (mobs.length === 0) return;
 
-      try {
-        bot.chat(`bunuh ${target.mobType} jap`);
-      } catch (e) {}
+    const target = mobs[0];
 
-      const attackInterval = setInterval(() => {
-        if (!target?.isValid || !bot.entity) {
-          clearInterval(attackInterval);
-          return;
-        }
+    equipWeapon();
 
-        if (bot.entity.position.distanceTo(target.position) < 3) {
-          bot.attack(target);
-        }
-      }, 800);
-    }
+    bot.chat(`bunuh ${target.mobType} jap`);
+    bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
+
+    const attackInterval = setInterval(() => {
+      if (!target.isValid) {
+        clearInterval(attackInterval);
+        return;
+      }
+
+      const dist = bot.entity.position.distanceTo(target.position);
+      if (dist < 3) {
+        bot.attack(target);
+      }
+    }, 600);
   }
 
-  setInterval(attackNearbyHostiles, 3000);
+  setInterval(attackHostile, 3000);
 
   bot.on('health', () => {
-    if (!botSpawned) return;
-
-    if (bot.health < lastHealth && !reacting) {
-      reacting = true;
-
-      const attacker = bot.nearestEntity(e =>
-        e.type === 'mob' &&
-        ['Zombie', 'Drowned', 'Creeper', 'Skeleton', 'Spider'].includes(e.mobType)
-      );
-
-      const isDrowning = bot.entity.isInWater;
-      const isBurning = bot.entity.onFire;
-
-      const message = (isDrowning || isBurning)
-        ? dangerMessages[Math.floor(Math.random() * dangerMessages.length)]
-        : hitMessages[Math.floor(Math.random() * hitMessages.length)];
-
-      try {
-        bot.chat(message);
-      } catch (e) {}
-
-      if (attacker && attacker.position) {
-        equipWeapon();
-
-        const attackLoop = setInterval(() => {
-          if (!attacker?.isValid) {
-            clearInterval(attackLoop);
-            reacting = false;
-            return;
-          }
-
-          if (bot.entity.position.distanceTo(attacker.position) < 3) {
-            bot.attack(attacker);
-          }
-        }, 800);
-
-        setTimeout(() => {
-          clearInterval(attackLoop);
-          reacting = false;
-        }, 5000);
-      } else {
-        reacting = false;
-      }
+    if (bot.health < lastHealth) {
+      bot.chat('sakitnyo');
     }
-
     lastHealth = bot.health;
   });
 
@@ -137,9 +88,7 @@ function createBot() {
     if (!botSpawned) return;
 
     const player = bot.players[username];
-    if (!player || !player.entity) {
-      return bot.chat("mana ko?");
-    }
+    if (!player || !player.entity) return;
 
     const msg = message.toLowerCase();
 
@@ -164,6 +113,7 @@ function createBot() {
     }
   }, 3000);
 
+  // Bot jump every 10 sec (funny behavior)
   setInterval(() => {
     if (botSpawned && bot.setControlState) {
       bot.setControlState('jump', true);
@@ -171,6 +121,7 @@ function createBot() {
     }
   }, 10000);
 
+  // Bot randomly looks around
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -178,6 +129,7 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
+  // Random funny messages
   const messages = [
     "mne iman my love", "kaya siak server baru", "piwit boleh bunuh zombie bagai siottt",
     "lepasni aq jdi bodygard korg yehaww", "bising bdo karina", "amirul hadif x nurul iman very very sweet good",
