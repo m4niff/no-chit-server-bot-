@@ -168,3 +168,4 @@ bot.once('spawn', () => {
     console.log("🚫 Bot was kicked:", reason);
     setTimeout(createBot, 90000);
   });
+}
