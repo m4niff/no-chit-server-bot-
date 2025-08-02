@@ -19,6 +19,29 @@ function createBot() {
     const mcData = require('minecraft-data')(bot.version);
     const defaultMove = new Movements(bot, mcData);
     bot.pathfinder.setMovements(defaultMove);
+    let lastHealth = bot.health;
+
+bot.on('health', () => {
+  if (bot.health < lastHealth) {
+    const attacker = bot.nearestEntity(entity =>
+      entity.type === 'player' &&
+      entity.username !== bot.username &&
+      entity.position.distanceTo(bot.entity.position) < 5
+    );
+
+    bot.chat("sakit la babi");
+
+    if (attacker) {
+      bot.lookAt(attacker.position.offset(0, attacker.height, 0), true).then(() => {
+        bot.attack(attacker);
+        console.log(`🗡️ Retaliating against ${attacker.username}`);
+      }).catch(() => {});
+    }
+  }
+
+  lastHealth = bot.health;
+});
+
 
     // 🧠 Move randomly every few seconds
     const directions = ['forward', 'back', 'left', 'right'];
