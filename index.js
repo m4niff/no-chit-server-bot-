@@ -43,17 +43,20 @@ const dangerMessages = [
   'AQ BUTUH MEDKIT',
 ];
 
-// Avoid water by customizing movements
-defaultMove = new Movements(bot, bot.registry); // 
-defaultMove.scafoldingBlocks = []; // prevent climbing
-defaultMove.allowSprinting = true;
-defaultMove.canDig = false;
-defaultMove.blocksToAvoid.add(8);  // Water
-defaultMove.blocksToAvoid.add(9);  // Flowing water
+let defaultMove; // Declare it globally if needed outside
 
-bot.on('health', () => {
-  if (bot.health < lastHealth && !reacting) {
-    reacting = true;
+bot.once('spawn', () => {
+  // Setup movement AFTER spawn
+  defaultMove = new Movements(bot, bot.registry);
+  defaultMove.scafoldingBlocks = []; // prevent climbing
+  defaultMove.allowSprinting = true;
+  defaultMove.canDig = false;
+  defaultMove.blocksToAvoid.add(8);  // Water
+  defaultMove.blocksToAvoid.add(9);  // Flowing water
+
+  bot.pathfinder.setMovements(defaultMove);
+});
+
 
     const attacker = bot.nearestEntity(e => e.type === 'player' || e.type === 'mob');
     const isDrowning = bot.entity.isInWater;
