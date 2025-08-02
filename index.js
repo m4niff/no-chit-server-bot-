@@ -1,7 +1,7 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { GoalNear } = goals;
-const mcDataLoader = require('minecraft-data');
+mcData = mcDataLoader(bot.version);
 
 const bot = mineflayer.createBot({
   host: 'neymar.aternos.me',
