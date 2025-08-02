@@ -22,72 +22,79 @@ function createBot() {
 const { Vec3 } = require('vec3');
 const { GoalNear } = require('mineflayer-pathfinder').goals;
 
-const avoidWaterMovements = new Movements(bot);
-avoidWaterMovements.allow1by1towers = false;
-avoidWaterMovements.scafoldingBlocks = [];
+let lastHealth = 20;
+let reacting = false;
 
-bot.once('spawn', () => {
-  bot.pathfinder.setMovements(avoidWaterMovements);
-});
-
-const hitReplies = [
+const hitMessages = [
   'sakit la babi',
   'suda cukup cukup suda',
   'AWAWAW',
   'sok asik',
-  'weh jgn pukul aq',
-  'tak baik camni 😢',
-  'weh jgn bro',
-  'adui mak',
+  'weh ko ni',
+  'apasal pukul aku',
+  'ko ni bodoh ka'
 ];
 
-const damageReplies = [
+const dangerMessages = [
   'OUCH',
   'UDA TOLONG AQ UDA',
   'AQ BUTUH MEDKIT',
-  'kena bakar sial',
-  'help aq lemas',
+  'AQ LEMAH',
+  'NI API PANAS WOI'
 ];
 
-bot.on('entityHurt', (entity) => {
-  if (entity === bot.entity) {
-    const healthNow = bot.health;
+// Avoid water by customizing movements
+const defaultMove = new Movements(bot);
+defaultMove.scafoldingBlocks = []; // prevent climbing
+defaultMove.allowSprinting = true;
+defaultMove.canDig = false;
+defaultMove.blocksToAvoid.add(8);  // Water
+defaultMove.blocksToAvoid.add(9);  // Flowing water
 
-    // Determine what caused the hurt
-    const cause = bot.entity.metadata?.[8]?.value || ''; // usually shows damage type if supported
+bot.on('health', () => {
+  if (bot.health < lastHealth && !reacting) {
+    reacting = true;
 
-    const attacker = Object.values(bot.entities).find(e => e.type === 'player' || e.type === 'mob' && bot.entity.position.distanceTo(e.position) < 4);
-    
-    const isFireOrDrowning = bot.isBurning || bot.entity.isInWater;
+    const attacker = bot.nearestEntity(e => e.type === 'player' || e.type === 'mob');
+    const isDrowning = bot.entity.isInWater;
+    const isBurning = bot.entity.onFire;
 
-    if (!reacting) {
-      reacting = true;
+    let message = '';
 
-      // Random reply
-      const replyList = isFireOrDrowning ? damageReplies : hitReplies;
-      const message = replyList[Math.floor(Math.random() * replyList.length)];
-      bot.chat(message);
+    if (isDrowning || isBurning) {
+      message = dangerMessages[Math.floor(Math.random() * dangerMessages.length)];
+    } else {
+      message = hitMessages[Math.floor(Math.random() * hitMessages.length)];
+    }
 
-      // Look at attacker and chase a bit
-      if (attacker) {
-        bot.lookAt(attacker.position.offset(0, 1.6, 0), true);
-        
+    bot.chat(message);
+
+    if (attacker && attacker.position) {
+      // Chase attacker after delay
+      setTimeout(() => {
+        bot.pathfinder.setMovements(defaultMove);
+        bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+
+        // Hit attacker after 3 seconds
         setTimeout(() => {
-          bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
-        }, 3000); // 3 sec delay before chasing
+          if (bot.entity.position.distanceTo(attacker.position) < 4) {
+            bot.attack(attacker);
+          }
 
-        // Walk away like nothing happened after 5 sec
-        setTimeout(() => {
-          const offset = new Vec3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
-          const away = bot.entity.position.plus(offset);
-          bot.pathfinder.setGoal(new GoalNear(away.x, away.y, away.z, 1));
+          // Walk away like nothing happened
+          const awayVec = attacker.position.offset(Math.random() * 4 - 2, 0, Math.random() * 4 - 2);
+          bot.pathfinder.setGoal(new GoalNear(awayVec.x, awayVec.y, awayVec.z, 1));
+
           reacting = false;
-        }, 8000);
-      } else {
-        reacting = false;
-      }
+        }, 3000);
+
+      }, 1000); // Delay before chasing
+    } else {
+      reacting = false;
     }
   }
+
+  lastHealth = bot.health;
 });
 
 
@@ -197,7 +204,6 @@ setInterval(() => {
       bot.chat(messages[index]);
       index = (index + 1) % messages.length;
     }, 90000);
-  });
 
   // ✅ Reconnect on error
   bot.on('end', () => {
