@@ -283,10 +283,3 @@ setInterval(() => {
     console.log("🚫 Bot was kicked:", reason);
     setTimeout(createBot, 90000);
   });
-
-createBot();
-
-// ✅ Keep-alive using Express
-const app = express();
-app.get("/", (req, res) => res.send("Bot is running"));
-app.listen(3000, () => console.log("🌐 Express server active on port 3000"));
