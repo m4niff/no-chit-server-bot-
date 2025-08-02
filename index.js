@@ -29,7 +29,7 @@ let following = false;
 
 // When bot spawns
 bot.once('spawn', () => {
-  defaultMove = new Movements(bot);
+  defaultMove = new Movements(bot); // ✅ Use without "const"
   defaultMove.allowSprinting = true;
   defaultMove.canDig = false;
   defaultMove.blocksToAvoid.add(8); // Water
