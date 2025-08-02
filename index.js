@@ -1,28 +1,87 @@
 const mineflayer = require('mineflayer');
-const { pathfinder, Movements, goals: { GoalFollow } } = require('mineflayer-pathfinder');
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const express = require('express');
 
-let bot;
+const app = express();
+const port = process.env.PORT || 3000;
 
-function createBot() {
-  bot = mineflayer.createBot({
-    host: "neymar.aternos.me",
-    port: 48991,
-    username: "messi",
-    version: "1.21.1",
-    keepAlive: false
-  });
+// Express server for keeping bot alive
+app.get('/', (req, res) => {
+  res.send('Bot is running');
+});
+app.listen(port, () => {
+  console.log(`🌐 Express server active on port ${port}`);
+});
 
- bot.once('spawn', () => {
-  const defaultMove = new Movements(bot);
-  defaultMove.scafoldingBlocks = [];
+// Bot setup
+const bot = mineflayer.createBot({
+  host: 'neymar.aternos.me', // Change to your server IP
+  port: 48991,        // Change if needed
+  username: 'messi' // Any name you like
+});
+
+// Load pathfinder
+bot.loadPlugin(pathfinder);
+
+// Global movement settings
+let defaultMove;
+
+// On spawn, set pathfinding behavior
+bot.once('spawn', () => {
+  defaultMove = new Movements(bot);
   defaultMove.allowSprinting = true;
   defaultMove.canDig = false;
-  defaultMove.blocksToAvoid.add(8);  // Water
-  defaultMove.blocksToAvoid.add(9);  // Flowing water
+  defaultMove.blocksToAvoid.add(8); // Water
+  defaultMove.blocksToAvoid.add(9); // Flowing water
+
   bot.pathfinder.setMovements(defaultMove);
-  console.log('🤖 Bot has spawned');
+  console.log('🤖 Bot has spawned and ready');
 });
+
+// Follow player when chat command is given
+let following = false;
+
+bot.on('chat', (username, message) => {
+  if (username === bot.username) return;
+
+  if (message.toLowerCase() === 'woi ikut aq') {
+    const player = bot.players[username]?.entity;
+    if (!player) {
+      bot.chat("where u at?");
+      return;
+    }
+
+    bot.chat('ight where we going');
+    following = true;
+
+    followPlayer(player);
+  }
+
+  if (message.toLowerCase() === 'stop') {
+    bot.chat('tf now what');
+    following = false;
+    bot.pathfinder.setGoal(null);
+  }
+});
+
+function followPlayer(player) {
+  if (!player) return;
+
+  const followInterval = setInterval(() => {
+    if (!following || !player.isValid) {
+      clearInterval(followInterval);
+      return;
+    }
+
+    const goal = new goals.GoalFollow(player, 1);
+    bot.pathfinder.setGoal(goal, true);
+  }, 1000);
+}
+
+// Error logging
+bot.on('error', err => console.error('Bot error:', err));
+bot.on('end', () => console.log('Bot disconnected.'));
+
 
 const { Vec3 } = require('vec3');
 const { GoalNear } = require('mineflayer-pathfinder').goals;
@@ -44,8 +103,6 @@ const dangerMessages = [
   'OUCH',
   'UDA TOLONG AQ UDA',
   'AQ BUTUH MEDKIT',
-  'AQ LEMAH',
-  'NI API PANAS WOI'
 ];
 
 // Avoid water by customizing movements
