@@ -3,6 +3,8 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { GoalNear } = goals;
 const mcDataLoader = require('minecraft-data');
 
+let mcData;
+
 const bot = mineflayer.createBot({
   host: 'neymar.aternos.me',
   port: 48991,
@@ -20,8 +22,11 @@ const hitMessages = [
   'apasal pukul aku', 'ko ni bodoh ka'
 ];
 
+const dangerMessages = [
+  'tenggelam siakkkk', 'bakar hidup hidup??', 'tolong panas gila', 'aku lemas dowhhh'
+];
 
-// 🔁 On bot spawn
+// 🟢 On spawn
 bot.once('spawn', () => {
   mcData = mcDataLoader(bot.version);
   defaultMove = new Movements(bot, mcData);
@@ -35,11 +40,15 @@ bot.once('spawn', () => {
   console.log('✅ Bot spawned, movements ready.');
 });
 
-// 👊 React to being hurt
+// 👊 React to damage
 bot.on('health', () => {
   if (bot.health < lastHealth && !reacting) {
     reacting = true;
-    const attacker = bot.nearestEntity(e => e.type === 'player' || e.type === 'mob');
+
+    const attacker = bot.nearestEntity(entity =>
+      entity.type === 'player' || entity.type === 'mob'
+    );
+
     const isDrowning = bot.entity.isInWater;
     const isBurning = bot.entity.onFire;
 
@@ -51,10 +60,15 @@ bot.on('health', () => {
 
     if (attacker && attacker.position) {
       setTimeout(() => {
-        bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+        bot.pathfinder.setGoal(new GoalNear(
+          attacker.position.x,
+          attacker.position.y,
+          attacker.position.z,
+          1
+        ));
 
         setTimeout(() => {
-          if (bot.entity.position.distanceTo(attacker.position) < 4) {
+          if (attacker && bot.entity.position.distanceTo(attacker.position) < 4) {
             bot.attack(attacker);
           }
 
@@ -71,7 +85,7 @@ bot.on('health', () => {
   lastHealth = bot.health;
 });
 
-// 🎤 Follow if player says "woi ikut aq"
+// 🎤 Follow command
 bot.on('chat', (username, message) => {
   if (message.toLowerCase() === 'woi ikut aq') {
     const player = bot.players[username];
@@ -81,12 +95,12 @@ bot.on('chat', (username, message) => {
     }
 
     const pos = player.entity.position;
-    bot.chat("ight" + username);
+    bot.chat("ight " + username);
     bot.pathfinder.setGoal(new GoalNear(pos.x, pos.y, pos.z, 1));
   }
 });
 
-// 🦶 Random idle movement
+// 🧍 Random movement
 const directions = ['forward', 'back', 'left', 'right'];
 setInterval(() => {
   const dir = directions[Math.floor(Math.random() * directions.length)];
@@ -94,13 +108,13 @@ setInterval(() => {
   setTimeout(() => bot.setControlState(dir, false), 1000);
 }, 15000);
 
-// 🦘 Jump every 10s
+// 🦘 Jumping
 setInterval(() => {
   bot.setControlState('jump', true);
   setTimeout(() => bot.setControlState('jump', false), 500);
 }, 10000);
 
-// 👁️ Random look
+// 👀 Look around randomly
 setInterval(() => {
   if (!bot.entity) return;
   const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -108,7 +122,7 @@ setInterval(() => {
   bot.look(yaw, pitch, true);
 }, 8000);
 
-// 💬 Random chat messages
+// 💬 Random chatting
 const messages = [
   "where the fuck am i tf?",
   "kaya siak server baru",
@@ -132,7 +146,7 @@ setInterval(() => {
   index = (index + 1) % messages.length;
 }, 90000);
 
-// 🔁 Reconnect
+// 🔁 Auto reconnect
 function createBot() {
   require('child_process').spawn('node', ['index.js'], {
     stdio: 'inherit'
