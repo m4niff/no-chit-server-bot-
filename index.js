@@ -15,6 +15,11 @@ function createBot() {
 
  bot.once('spawn', () => {
   const defaultMove = new Movements(bot);
+  defaultMove.scafoldingBlocks = [];
+  defaultMove.allowSprinting = true;
+  defaultMove.canDig = false;
+  defaultMove.blocksToAvoid.add(8);  // Water
+  defaultMove.blocksToAvoid.add(9);  // Flowing water
   bot.pathfinder.setMovements(defaultMove);
   console.log('🤖 Bot has spawned');
 });
