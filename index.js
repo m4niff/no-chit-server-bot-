@@ -19,54 +19,77 @@ function createBot() {
   console.log('🤖 Bot has spawned');
 });
 
-bot.on('health', async () => {
-  const nowHealth = bot.health;
+const { Vec3 } = require('vec3');
+const { GoalNear } = require('mineflayer-pathfinder').goals;
 
-  if (nowHealth < lastHealth && !chasing) {
-    const attacker = bot.nearestEntity(entity =>
-      entity.type === 'player' &&
-      entity.username !== bot.username &&
-      entity.position.distanceTo(bot.entity.position) < 10
-    );
+const avoidWaterMovements = new Movements(bot);
+avoidWaterMovements.allow1by1towers = false;
+avoidWaterMovements.scafoldingBlocks = [];
 
-    if (attacker) {
-      chasing = true;
-      bot.chat('sakit la babi',
-              'suda cukup cukup suda',
-              'AWAWAW',
-              'sok asik');
+bot.once('spawn', () => {
+  bot.pathfinder.setMovements(avoidWaterMovements);
+});
 
-      try {
-        await bot.lookAt(attacker.position.offset(0, attacker.height, 0), true);
-        bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+const hitReplies = [
+  'sakit la babi',
+  'suda cukup cukup suda',
+  'AWAWAW',
+  'sok asik',
+  'weh jgn pukul aq',
+  'tak baik camni 😢',
+  'weh jgn bro',
+  'adui mak',
+];
 
-        // Chase for 3 seconds
+const damageReplies = [
+  'OUCH',
+  'UDA TOLONG AQ UDA',
+  'AQ BUTUH MEDKIT',
+  'kena bakar sial',
+  'help aq lemas',
+];
+
+bot.on('entityHurt', (entity) => {
+  if (entity === bot.entity) {
+    const healthNow = bot.health;
+
+    // Determine what caused the hurt
+    const cause = bot.entity.metadata?.[8]?.value || ''; // usually shows damage type if supported
+
+    const attacker = Object.values(bot.entities).find(e => e.type === 'player' || e.type === 'mob' && bot.entity.position.distanceTo(e.position) < 4);
+    
+    const isFireOrDrowning = bot.isBurning || bot.entity.isInWater;
+
+    if (!reacting) {
+      reacting = true;
+
+      // Random reply
+      const replyList = isFireOrDrowning ? damageReplies : hitReplies;
+      const message = replyList[Math.floor(Math.random() * replyList.length)];
+      bot.chat(message);
+
+      // Look at attacker and chase a bit
+      if (attacker) {
+        bot.lookAt(attacker.position.offset(0, 1.6, 0), true);
+        
         setTimeout(() => {
-          bot.pathfinder.setGoal(null);
-          walkAway();
-          chasing = false;
-        }, 3000);
-      } catch (e) {
-        console.log('Error during chase:', e);
-        chasing = false;
+          bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+        }, 3000); // 3 sec delay before chasing
+
+        // Walk away like nothing happened after 5 sec
+        setTimeout(() => {
+          const offset = new Vec3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
+          const away = bot.entity.position.plus(offset);
+          bot.pathfinder.setGoal(new GoalNear(away.x, away.y, away.z, 1));
+          reacting = false;
+        }, 8000);
+      } else {
+        reacting = false;
       }
     }
   }
-
-  lastHealth = nowHealth;
 });
 
-function walkAway() {
-  const pos = bot.entity.position;
-  const dx = (Math.random() - 0.5) * 10;
-  const dz = (Math.random() - 0.5) * 10;
-
-  const walkX = pos.x + dx;
-  const walkZ = pos.z + dz;
-
-  bot.pathfinder.setGoal(new GoalNear(walkX, pos.y, walkZ, 1));
-  console.log('🚶 Walking away like nothing happened...');
-}
 
     // 🧠 Move randomly every few seconds
     const directions = ['forward', 'back', 'left', 'right'];
