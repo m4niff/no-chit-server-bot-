@@ -12,6 +12,7 @@ function createBot() {
     host: 'neymar.aternos.me',
     port: 48991,
     username: 'ronaldinho',
+    version: '1.21.1',
   });
 
   bot.loadPlugin(pathfinder);
