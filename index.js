@@ -26,27 +26,55 @@ const dangerMessages = [
   'tolong akuh'
 ];
 
-// 🟢 On spawn
 bot.once('spawn', () => {
   mcData = mcDataLoader(bot.version);
   defaultMove = new Movements(bot, mcData);
   defaultMove.scafoldingBlocks = [];
   defaultMove.allowSprinting = true;
   defaultMove.canDig = false;
-  defaultMove.blocksToAvoid.add(8); // Water
-  defaultMove.blocksToAvoid.add(9); // Flowing Water
+  defaultMove.blocksToAvoid.add(8);
+  defaultMove.blocksToAvoid.add(9);
 
   bot.pathfinder.setMovements(defaultMove);
   console.log('✅ Bot spawned, movements ready.');
 });
 
-// 👊 React to damage
+// Equip weapon if available
+function equipWeapon() {
+  const sword = bot.inventory.items().find(item => item.name.includes('sword'));
+  if (sword) {
+    bot.equip(sword, 'hand', () => {});
+  }
+}
+
+// Attack nearby hostile mobs
+function attackNearbyHostiles() {
+  const hostile = bot.nearestEntity(e =>
+    e.type === 'mob' &&
+    ['Drowned', 'Zombie', 'Skeleton', 'Creeper', 'Spider'].includes(e.mobType) &&
+    bot.entity.position.distanceTo(e.position) < 16
+  );
+
+  if (hostile) {
+    equipWeapon();
+    bot.chat(`aku bunuh ${hostile.mobType} ni jap`);
+    bot.pathfinder.setGoal(new GoalNear(hostile.position.x, hostile.position.y, hostile.position.z, 1));
+    setTimeout(() => {
+      bot.attack(hostile);
+    }, 1000);
+  }
+}
+
+// Scan and attack hostiles every 5 seconds
+setInterval(attackNearbyHostiles, 5000);
+
+// React to player/mob hit
 bot.on('health', () => {
   if (bot.health < lastHealth && !reacting) {
     reacting = true;
 
-    const attacker = bot.nearestEntity(entity =>
-      entity.type === 'player' || entity.type === 'mob'
+    const attacker = bot.nearestEntity(e =>
+      e.type === 'player' || e.type === 'mob'
     );
 
     const isDrowning = bot.entity.isInWater;
@@ -85,7 +113,7 @@ bot.on('health', () => {
   lastHealth = bot.health;
 });
 
-// 🎤 Follow command
+// Follow player if asked
 bot.on('chat', (username, message) => {
   if (message.toLowerCase() === 'woi ikut aq') {
     const player = bot.players[username];
@@ -100,7 +128,7 @@ bot.on('chat', (username, message) => {
   }
 });
 
-// 🧍 Random movement
+// Random idle movement
 const directions = ['forward', 'back', 'left', 'right'];
 setInterval(() => {
   const dir = directions[Math.floor(Math.random() * directions.length)];
@@ -108,62 +136,15 @@ setInterval(() => {
   setTimeout(() => bot.setControlState(dir, false), 1000);
 }, 15000);
 
-// 🦘 Jumping
+// Jump
 setInterval(() => {
   bot.setControlState('jump', true);
   setTimeout(() => bot.setControlState('jump', false), 500);
 }, 10000);
 
-// 👀 Look around randomly
+// Random look
 setInterval(() => {
   if (!bot.entity) return;
   const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
   const pitch = (Math.random() - 0.5) * Math.PI / 4;
-  bot.look(yaw, pitch, true);
-}, 8000);
-
-// 💬 Random chatting
-const messages = [
-  "mne iman my love",
-  "kaya siak server baru",
-  "piwit boleh bunuh zombie bagai siottt",
-  "lepasni aq jdi bodygard korg yehaww",
-  "what the fuck why asal tkde zombi monster bagai???",
-  "bising bdo karina",
-  "amirul hadif x nurul iman very very sweet good",
-  "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
-  "duatiga duatiga dua empat",
-  "boikot perempuan nme sofea pantek jubo lahanat",
-  "bising do bal",
-  "sat berak sat",
-  "sunyi siak",
-  "MUSTARRRRRRRDDDDDDDD",
-  "ok aq ulang blik dri awal"
-];
-let index = 0;
-setInterval(() => {
-  bot.chat(messages[index]);
-  index = (index + 1) % messages.length;
-}, 90000);
-
-// 🔁 Auto reconnect
-function createBot() {
-  require('child_process').spawn('node', ['index.js'], {
-    stdio: 'inherit'
-  });
-}
-
-bot.on('end', () => {
-  console.log("❌ Disconnected. Reconnecting in 90 seconds...");
-  setTimeout(createBot, 90000);
-});
-
-bot.on('error', err => {
-  console.log("⚠️ Error:", err.message);
-  setTimeout(createBot, 90000);
-});
-
-bot.on('kicked', reason => {
-  console.log("🚫 Bot was kicked:", reason);
-  setTimeout(createBot, 90000);
-});
+  bot.look(yaw,
