@@ -6,8 +6,8 @@ let bot;
 
 function createBot() {
   bot = mineflayer.createBot({
-    host: "skibidimustard.aternos.me",
-    port: 19470,
+    host: "neymar.aternos.me",
+    port: 48991,
     username: "messi",
     version: "1.12.1",
     keepAlive: false
@@ -84,10 +84,11 @@ setInterval(() => {
     // ✅ Chat loop
     const messages = [
        "where the fuck am i tf?",
-      "woiii harini birthday mirul hadif ka"
-      "mat hari jadi amirol doggy baby"
+      "kaya siak server baru"
+      "mirul doggy"
       "piwit boleh bunuh zombie bagai siottt",
       "lepasni aq jdi bodygard korg yehaww",
+      "what the fuck why asal tkde zombi monster bagai???",
       "bising bdo karina",
       "amirul hadif x nurul iman very very sweet good",
       "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
@@ -118,10 +119,8 @@ setInterval(() => {
       "aku selalu tersenyummmm",
       "nampak bosan kan? tapi game chat ni bole buat kita pejamkan mata dan bayangkan muka iman",
       "AUFFUDUDHDUDH SAKIT KEPALA AKU WIWOWUFJWOCBWOCJDOF TOLONG AKUH",
-      "SubhanAllah Alhamdulillah AstagfiruAllah Lailaha ilallah Allahu Akbar",
-      "taubat ygy",
       "kalaulah aku bleh main ngan korg hm",
-      "SAYA ULANGGG!!!"
+      "ok aq ulang blik dri awal"
     ];
     let index = 0;
     setInterval(() => {
