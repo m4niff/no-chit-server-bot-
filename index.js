@@ -9,7 +9,7 @@ function createBot() {
     host: "neymar.aternos.me",
     port: 48991,
     username: "messi",
-    version: "1.21.1",
+    version: "1.20.4",
     keepAlive: false
   });
 
