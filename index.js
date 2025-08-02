@@ -1,35 +1,21 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const express = require('express');
 
-const app = express();
-const port = process.env.PORT || 3000;
-
-// Create the bot
 const bot = mineflayer.createBot({
-  host: 'neymar.aternos.me',
+  host: 'neymar.aternos.met',
   port: 48991,
-  username: 'messi',
+  username: 'messi'
 });
 
-// Load pathfinder plugin
 bot.loadPlugin(pathfinder);
 
-// Global variables
-let defaultMove;
-let following = false;
-
 bot.once('spawn', () => {
-  defaultMove = new Movements(bot, bot.registry); // Only works after spawn!
-  defaultMove.allowSprinting = true;
-  defaultMove.canDig = false;
-  defaultMove.scafoldingBlocks = [];
-  defaultMove.blocksToAvoid.add(8); // Water
-  defaultMove.blocksToAvoid.add(9); // Flowing water
-
+  const defaultMove = new Movements(bot, bot.registry); // ✅ SAFE here
   bot.pathfinder.setMovements(defaultMove);
-  console.log("✅ Bot spawned and movement system initialized!");
+
+  console.log('✅ Bot spawned, movements ready.');
 });
+
 
 // Error handling
 bot.on('error', err => console.error('❌ Bot error:', err));
