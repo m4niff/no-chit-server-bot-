@@ -1,6 +1,7 @@
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { GoalFollow } = goals;
+const { plugin: pvp } = require('mineflayer-pvp');
 const mcDataLoader = require('minecraft-data');
 
 let mcData;
@@ -16,6 +17,7 @@ function createBot() {
   });
 
   bot.loadPlugin(pathfinder);
+  bot.loadPlugin(pvp);
 
   let defaultMove;
   let lastHealth = 20;
@@ -38,7 +40,6 @@ function createBot() {
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
 
-    // Avoid water blocks
     defaultMove.blocksToAvoid.add(8);
     defaultMove.blocksToAvoid.add(9);
 
@@ -59,7 +60,7 @@ function createBot() {
     const hostiles = Object.values(bot.entities).filter(e =>
       e.type === 'mob' &&
       ['Drowned', 'Zombie', 'Skeleton', 'Creeper', 'Spider'].includes(e.mobType) &&
-      bot.entity.position.distanceTo(e.position) < 20
+      bot.entity.position.distanceTo(e.position) < 16
     );
 
     if (hostiles.length > 0) {
@@ -70,19 +71,7 @@ function createBot() {
         bot.chat(`bunuh ${target.mobType} jap`);
       } catch (e) {}
 
-      bot.pathfinder.setGoal(new goals.GoalFollow(target, 1));
-
-      const attackLoop = setInterval(() => {
-        if (!target.isValid || !bot.entity) {
-          bot.pathfinder.setGoal(null);
-          clearInterval(attackLoop);
-          return;
-        }
-
-        if (bot.entity.position.distanceTo(target.position) < 3) {
-          bot.attack(target);
-        }
-      }, 800);
+      bot.pvp.attack(target);
     }
   }
 
@@ -110,23 +99,18 @@ function createBot() {
       } catch (e) {}
 
       if (attacker && attacker.position) {
-        setTimeout(() => {
-          bot.pathfinder.setGoal(new goals.GoalFollow(attacker, 1));
+        equipWeapon();
+        bot.pvp.attack(attacker);
 
-          setTimeout(() => {
-            if (attacker && bot.entity.position.distanceTo(attacker.position) < 4) {
-              bot.attack(attacker);
-            }
-            setTimeout(() => {
-              bot.pathfinder.setGoal(null);
-              reacting = false;
-            }, 4000);
-          }, 3000);
-        }, 1000);
+        setTimeout(() => {
+          bot.pvp.stop();
+          reacting = false;
+        }, 5000);
       } else {
         reacting = false;
       }
     }
+
     lastHealth = bot.health;
   });
 
@@ -161,7 +145,6 @@ function createBot() {
     }
   }, 3000);
 
-  // SAFE jump loop
   setInterval(() => {
     if (botSpawned && bot.setControlState) {
       bot.setControlState('jump', true);
