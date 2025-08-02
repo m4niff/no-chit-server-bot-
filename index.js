@@ -5,7 +5,7 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Express server for keeping bot alive
+// Express web server to keep bot alive
 app.get('/', (req, res) => {
   res.send('Bot is running');
 });
@@ -13,20 +13,21 @@ app.listen(port, () => {
   console.log(`🌐 Express server active on port ${port}`);
 });
 
-// Bot setup
+// Create the bot
 const bot = mineflayer.createBot({
-  host: 'neymar.aternos.me', // Change to your server IP
-  port: 48991,        // Change if needed
-  username: 'messi' // Any name you like
+  host: 'neymar.aternos.me',
+  port: 48991,
+  username: 'messi',
 });
 
-// Load pathfinder
+// Load pathfinder plugin
 bot.loadPlugin(pathfinder);
 
-// Global movement settings
+// Global variables
 let defaultMove;
+let following = false;
 
-// On spawn, set pathfinding behavior
+// When bot spawns
 bot.once('spawn', () => {
   defaultMove = new Movements(bot);
   defaultMove.allowSprinting = true;
@@ -35,41 +36,41 @@ bot.once('spawn', () => {
   defaultMove.blocksToAvoid.add(9); // Flowing water
 
   bot.pathfinder.setMovements(defaultMove);
-  console.log('🤖 Bot has spawned and ready');
+  console.log('🤖 Bot has spawned and is ready');
 });
 
-// Follow player when chat command is given
-let following = false;
-
+// Chat commands
 bot.on('chat', (username, message) => {
   if (username === bot.username) return;
 
-  if (message.toLowerCase() === 'woi ikut aq') {
+  const msg = message.toLowerCase();
+
+  if (msg === 'woi ikut aq') {
     const player = bot.players[username]?.entity;
     if (!player) {
-      bot.chat("where u at?");
+      bot.chat("mana hang?");
       return;
     }
 
-    bot.chat('ight where we going');
+    bot.chat('jap ah aku ikut hang');
     following = true;
-
     followPlayer(player);
   }
 
-  if (message.toLowerCase() === 'stop') {
-    bot.chat('tf now what');
+  if (msg === 'stop') {
+    bot.chat('baik ah aku stop');
     following = false;
     bot.pathfinder.setGoal(null);
   }
 });
 
+// Follow logic
 function followPlayer(player) {
   if (!player) return;
 
-  const followInterval = setInterval(() => {
+  const interval = setInterval(() => {
     if (!following || !player.isValid) {
-      clearInterval(followInterval);
+      clearInterval(interval);
       return;
     }
 
@@ -78,9 +79,9 @@ function followPlayer(player) {
   }, 1000);
 }
 
-// Error logging
-bot.on('error', err => console.error('Bot error:', err));
-bot.on('end', () => console.log('Bot disconnected.'));
+// Error handling
+bot.on('error', err => console.error('❌ Bot error:', err));
+bot.on('end', () => console.log('🔌 Bot disconnected'));
 
 
 const { Vec3 } = require('vec3');
