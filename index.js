@@ -14,7 +14,7 @@ function createBot() {
   });
 
  
-// Web server to keep Render alive
+// 🟢 Web server to keep Render alive
 app.get('/', (req, res) => res.send('Bot is running'));
 app.listen(3000, () => console.log('🌐 Express server active'));
 
@@ -54,7 +54,7 @@ bot.on('health', async () => {
           chasing = false;
         }, 3000);
       } catch (e) {
-        console.log('Error looking at attacker:', e);
+        console.log('Error during chase:', e);
         chasing = false;
       }
     }
