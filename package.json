@@ -1,3 +1,13 @@
-"dependencies": {
-  "mineflayer": "" // or remove version to always get latest
+{
+  "name": "minecraft-bot",
+  "version": "1.0.0",
+  "description": "A Mineflayer Minecraft bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "mineflayer": "*",
+    "express": "^4.18.2"
+  }
 }
