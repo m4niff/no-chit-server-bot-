@@ -19,29 +19,52 @@ function createBot() {
     const mcData = require('minecraft-data')(bot.version);
     const defaultMove = new Movements(bot, mcData);
     bot.pathfinder.setMovements(defaultMove);
-    let lastHealth = bot.health;
+    let lastHealth = 20;
+let lastHitTime = 0;
+
+bot.on('spawn', () => {
+  console.log('🤖 Bot has spawned');
+});
 
 bot.on('health', () => {
-  if (bot.health < lastHealth) {
+  const now = Date.now();
+  if (bot.health < lastHealth && now - lastHitTime > 5000) {
+    lastHitTime = now;
+
+    // Send chat message after getting hit
+    bot.chat('sakit la babi');
+
+    // Attack nearby player (not the bot itself)
     const attacker = bot.nearestEntity(entity =>
       entity.type === 'player' &&
       entity.username !== bot.username &&
       entity.position.distanceTo(bot.entity.position) < 5
     );
 
-    bot.chat("sakit la babi");
-
     if (attacker) {
       bot.lookAt(attacker.position.offset(0, attacker.height, 0), true).then(() => {
         bot.attack(attacker);
         console.log(`🗡️ Retaliating against ${attacker.username}`);
       }).catch(() => {});
+    } else {
+      // Fallback: attack hostile mobs (optional)
+      const mobAttacker = bot.nearestEntity(e =>
+        e.type === 'mob' &&
+        ['zombie', 'skeleton', 'spider', 'creeper'].includes(e.name) &&
+        e.position.distanceTo(bot.entity.position) < 5
+      );
+
+      if (mobAttacker) {
+        bot.lookAt(mobAttacker.position.offset(0, mobAttacker.height, 0), true).then(() => {
+          bot.attack(mobAttacker);
+          console.log(`🗡️ Retaliating against ${mobAttacker.name}`);
+        }).catch(() => {});
+      }
     }
   }
 
   lastHealth = bot.health;
 });
-
 
     // 🧠 Move randomly every few seconds
     const directions = ['forward', 'back', 'left', 'right'];
