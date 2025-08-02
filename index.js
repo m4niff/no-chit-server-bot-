@@ -20,9 +20,6 @@ const hitMessages = [
   'apasal pukul aku', 'ko ni bodoh ka'
 ];
 
-const dangerMessages = [
-  'OUCH', 'UDA TOLONG AQ UDA', 'AQ BUTUH MEDKIT'
-];
 
 // 🔁 On bot spawn
 bot.once('spawn', () => {
