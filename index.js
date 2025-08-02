@@ -39,7 +39,6 @@ bot.on('end', () => console.log('🔌 Bot disconnected'));
 
 const { Vec3 } = require('vec3');
 const { GoalNear } = require('mineflayer-pathfinder').goals;
-
 let lastHealth = 20;
 let reacting = false;
 
