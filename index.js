@@ -12,7 +12,7 @@ let defaultMove;
 let botSpawned = false;
 let lastAttacker = null;
 
-const hostileMobs = ['zombie', 'drowned', 'skeleton', 'creeper', 'spider'];
+const hostileMobs = ['zombie', 'drowned', 'skeleton', 'creeper', 'spider', 'husk', 'witch', 'zombified_piglin', 'zoglin', 'phantom', 'vex', 'pillager', 'evoker', 'vindication', 'ravager'];
 
 function createBot() {
   console.log('🔄 Creating bot...');
