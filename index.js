@@ -25,7 +25,6 @@ function createBot() {
 
   bot.loadPlugin(pathfinder);
 
-  // === Bot Events ===
   bot.once('spawn', () => {
     console.log("✅ Bot spawned and ready.");
     botSpawned = true;
@@ -147,33 +146,34 @@ function createBot() {
     }
   });
 
-// === Auto Hunt (fixed) ===
-setInterval(() => {
-  if (!botSpawned || bot.health <= 0) return;
+  // === Auto Hunt (fixed) ===
+  setInterval(() => {
+    if (!botSpawned || bot.health <= 0) return;
 
-  const target = bot.nearestEntity(entity =>
-    entity.type === 'mob' &&
-    hostileMobs.includes(entity.name) &&
-    entity.position.distanceTo(bot.entity.position) < 10
-  );
+    const target = bot.nearestEntity(entity =>
+      entity.type === 'mob' &&
+      hostileMobs.includes(entity.name) &&
+      entity.position.distanceTo(bot.entity.position) < 10
+    );
 
-  if (target) {
-    lastAttacker = target;
-    equipWeapon();
-    bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
+    if (target) {
+      lastAttacker = target;
+      equipWeapon();
+      bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
 
-    const attackLoop = setInterval(() => {
-      if (!target?.isValid || !bot.entity) return clearInterval(attackLoop);
+      const attackLoop = setInterval(() => {
+        if (!target?.isValid || !bot.entity) return clearInterval(attackLoop);
 
-      const dist = bot.entity.position.distanceTo(target.position);
-      if (dist < 3) {
-        bot.lookAt(target.position.offset(0, target.height, 0)).then(() => {
-          bot.attack(target);
-        }).catch(() => {});
-      }
-    }, 500);
-  }
-}, 3000);
+        const dist = bot.entity.position.distanceTo(target.position);
+        if (dist < 3) {
+          bot.lookAt(target.position.offset(0, target.height, 0)).then(() => {
+            bot.attack(target);
+          }).catch(() => {});
+        }
+      }, 500);
+    }
+  }, 3000);
+}
 
 createBot();
 
