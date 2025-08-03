@@ -21,7 +21,7 @@ function createBot() {
   let botSpawned = false;
   let lastHealth = 20;
 
-  const hostileMobs = ['Zombie', 'Drowned', 'Skeleton', 'Creeper', 'Spider'];
+  const hostileMobs = ['zombie', 'drowned', 'skeleton', 'creeper', 'spider'];
 
   bot.once('spawn', () => {
     botSpawned = true;
@@ -29,7 +29,6 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-
     defaultMove.blocksToAvoid.add(8); // water
     defaultMove.blocksToAvoid.add(9); // flowing water
 
@@ -49,7 +48,7 @@ function createBot() {
 
     const mobs = Object.values(bot.entities).filter(e =>
       e.type === 'mob' &&
-      hostileMobs.includes(e.mobType) &&
+      hostileMobs.includes(e.displayName?.toLowerCase?.()) &&
       bot.entity.position.distanceTo(e.position) < 16
     );
 
@@ -59,7 +58,7 @@ function createBot() {
 
     equipWeapon();
 
-    bot.chat(`bunuh ${target.mobType} jap`);
+    bot.chat(`bunuh ${target.displayName} jap`);
     bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
 
     const attackInterval = setInterval(() => {
@@ -113,7 +112,6 @@ function createBot() {
     }
   }, 3000);
 
-  // Bot jump every 10 sec (funny behavior)
   setInterval(() => {
     if (botSpawned && bot.setControlState) {
       bot.setControlState('jump', true);
@@ -121,7 +119,6 @@ function createBot() {
     }
   }, 10000);
 
-  // Bot randomly looks around
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -129,7 +126,6 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
-  // Random funny messages
   const messages = [
     "mne iman my love", "kaya siak server baru", "piwit boleh bunuh zombie bagai siottt",
     "lepasni aq jdi bodygard korg yehaww", "bising bdo karina", "amirul hadif x nurul iman very very sweet good",
