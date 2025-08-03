@@ -29,8 +29,8 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8); // water
-    defaultMove.blocksToAvoid.add(9); // flowing water
+    defaultMove.blocksToAvoid.add(8);
+    defaultMove.blocksToAvoid.add(9);
 
     bot.pathfinder.setMovements(defaultMove);
     console.log("✅ Bot spawned and ready.");
@@ -55,7 +55,6 @@ function createBot() {
     if (mobs.length === 0) return;
 
     const target = mobs[0];
-
     equipWeapon();
 
     bot.chat(`bunuh ${target.displayName} jap`);
@@ -143,22 +142,6 @@ function createBot() {
       } catch (e) {}
     }
   }, 90000);
-
-  const handleReconnect = () => {
-    botSpawned = false;
-    console.log("❌ Disconnected. Reconnecting in 90 seconds...");
-    setTimeout(createBot, 90000);
-  };
-
-  bot.on('end', handleReconnect);
-  bot.on('error', err => {
-    console.log("⚠️ Error:", err.message);
-    handleReconnect();
-  });
-  bot.on('kicked', reason => {
-    console.log("🚫 Bot was kicked:", reason);
-    handleReconnect();
-  });
 }
 
 createBot();
