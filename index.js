@@ -2,6 +2,7 @@ const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { GoalFollow, GoalNear } = goals;
 const mcDataLoader = require('minecraft-data');
+const express = require('express');
 
 let mcData;
 let following = false;
@@ -19,7 +20,7 @@ function createBot() {
 
   let defaultMove;
   let botSpawned = false;
-  let lastHealth = 20;
+  let lastAttacker = null;
 
   const hostileMobs = ['zombie', 'drowned', 'skeleton', 'creeper', 'spider'];
 
@@ -36,14 +37,20 @@ function createBot() {
     console.log("✅ Bot spawned and ready.");
   });
 
+  function equipWeapon() {
+    const sword = bot.inventory.items().find(item => item.name.includes('sword'));
+    if (sword) {
+      bot.equip(sword, 'hand').catch(() => {});
+    }
+  }
+
+  // === Follow Commands ===
   bot.on('chat', (username, message) => {
     if (!botSpawned) return;
-
     const player = bot.players[username];
     if (!player || !player.entity) return;
 
     const msg = message.toLowerCase();
-
     if (msg === 'woi ikut aq') {
       followTarget = player.entity;
       following = true;
@@ -65,6 +72,7 @@ function createBot() {
     }
   }, 3000);
 
+  // === Jump Randomly ===
   setInterval(() => {
     if (botSpawned && bot.setControlState) {
       bot.setControlState('jump', true);
@@ -72,6 +80,7 @@ function createBot() {
     }
   }, 10000);
 
+  // === Random Look Around ===
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -79,6 +88,7 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
+  // === Periodic Chat Messages ===
   const messages = [
     "mne iman my love", "kaya siak server baru", "piwit boleh bunuh zombie bagai siottt",
     "lepasni aq jdi bodygard korg yehaww", "bising bdo karina", "amirul hadif x nurul iman very very sweet good",
@@ -97,22 +107,64 @@ function createBot() {
     }
   }, 90000);
 
-  let lastAttacker = null;
-
+  // === Retaliation System ===
   bot.on('entityHurt', (entity) => {
-    ...
+    if (!botSpawned || !entity) return;
+
+    // If bot was attacked
+    if (entity.uuid === bot.uuid) {
+      const attacker = Object.values(bot.entities).find(e =>
+        e.position.distanceTo(bot.entity.position) < 4 &&
+        (e.type === 'mob' || e.type === 'player') &&
+        hostileMobs.includes(e.name)
+      );
+
+      if (attacker) {
+        lastAttacker = attacker;
+        equipWeapon();
+        bot.chat(`yo tf? ${attacker.name}`);
+        bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+
+        const retaliate = setInterval(() => {
+          if (!attacker?.isValid || !bot.entity) {
+            clearInterval(retaliate);
+            return;
+          }
+
+          const dist = bot.entity.position.distanceTo(attacker.position);
+          if (dist < 3) {
+            bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
+              bot.attack(attacker);
+            }).catch(() => {});
+          }
+        }, 500);
+      }
+    }
   });
 
+  // === Berserk Mode ===
   bot.on('health', () => {
-    ...
+    if (bot.health < 5 && lastAttacker && lastAttacker.isValid) {
+      bot.chat('ur goin too far dawg');
+      equipWeapon();
+
+      const spamAttack = setInterval(() => {
+        if (!lastAttacker?.isValid || !bot.entity || bot.health <= 0) {
+          clearInterval(spamAttack);
+          return;
+        }
+
+        bot.lookAt(lastAttacker.position.offset(0, lastAttacker.height, 0)).then(() => {
+          bot.attack(lastAttacker);
+        }).catch(() => {});
+      }, 200);
+    }
   });
 }
 
-// DO NOT PUT IT AFTER THIS LINE ⛔
 createBot();
 
 // === FAKE EXPRESS SERVER FOR RENDER ===
-const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -121,5 +173,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(🌐 Fake server listening on port ${port});
+  console.log(`🌐 Fake server listening on port ${port}`);
 });
