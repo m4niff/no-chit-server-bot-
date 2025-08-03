@@ -96,8 +96,19 @@ function createBot() {
       } catch (e) {}
     }
   }, 90000);
+
+  let lastAttacker = null;
+
+  bot.on('entityHurt', (entity) => {
+    ...
+  });
+
+  bot.on('health', () => {
+    ...
+  });
 }
 
+// DO NOT PUT IT AFTER THIS LINE ⛔
 createBot();
 
 // === FAKE EXPRESS SERVER FOR RENDER ===
@@ -112,57 +123,3 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(🌐 Fake server listening on port ${port});
 });
-
-// ADD THIS AT THE END of createBot() BEFORE createBot() ENDS
-
-  let lastAttacker = null;
-
-  bot.on('entityHurt', (entity) => {
-    if (!botSpawned || !entity || entity === bot.entity) return;
-
-    // Check if bot got hurt
-    const attacker = Object.values(bot.entities).find(e =>
-      e.type === 'player' || e.type === 'mob'
-    );
-
-    if (entity.uuid === bot.uuid && attacker) {
-      lastAttacker = attacker;
-      equipWeapon();
-      bot.chat(`yo tf? ${attacker.username || attacker.name}`);
-
-      bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
-
-      const retaliate = setInterval(() => {
-        if (!attacker?.isValid || !bot.entity) {
-          clearInterval(retaliate);
-          return;
-        }
-
-        const dist = bot.entity.position.distanceTo(attacker.position);
-        if (dist < 3) {
-          bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
-            bot.attack(attacker);
-          }).catch(() => {});
-        }
-      }, 500);
-    }
-  });
-
-  // BERSERK MODE when low HP
-  bot.on('health', () => {
-    if (bot.health < 5 && lastAttacker && lastAttacker.isValid) {
-      bot.chat('ur goin too far dawg');
-      equipWeapon();
-
-      const spamAttack = setInterval(() => {
-        if (!lastAttacker?.isValid || !bot.entity || bot.health <= 0) {
-          clearInterval(spamAttack);
-          return;
-        }
-
-        bot.lookAt(lastAttacker.position.offset(0, lastAttacker.height, 0)).then(() => {
-          bot.attack(lastAttacker);
-        }).catch(() => {});
-      }, 200); // Fast attacks
-    }
-  });
