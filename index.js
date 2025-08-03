@@ -48,7 +48,7 @@ function createBot() {
 
     const mobs = Object.values(bot.entities).filter(e =>
       e.type === 'mob' &&
-      hostileMobs.includes(e.mobType?.toLowerCase?.()) &&
+      hostileMobs.includes(e.name?.toLowerCase?.()) &&
       bot.entity.position.distanceTo(e.position) < 16
     );
 
@@ -57,11 +57,11 @@ function createBot() {
     const target = mobs[0];
     equipWeapon();
 
-    bot.chat(`bunuh ${target.mobType} jap`);
+    bot.chat(`bunuh ${target.name} jap`);
     bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
 
     const attackInterval = setInterval(() => {
-      if (!target.isValid) {
+      if (!target?.isValid || !bot.entity) {
         clearInterval(attackInterval);
         return;
       }
