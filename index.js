@@ -1,4 +1,11 @@
-// ... [your existing imports and variables] ...
+const mineflayer = require('mineflayer');
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+const { GoalFollow, GoalNear } = goals;
+const mcDataLoader = require('minecraft-data');
+
+let mcData;
+let following = false;
+let followTarget = null;
 
 function createBot() {
   const bot = mineflayer.createBot({
@@ -29,89 +36,6 @@ function createBot() {
     console.log("✅ Bot spawned and ready.");
   });
 
-  function equipWeapon() {
-    const weapon = bot.inventory.items().find(item => item.name.includes('sword'));
-    if (weapon) {
-      bot.equip(weapon, 'hand').catch(() => {});
-    }
-  }
-
-  function attackHostile() {
-    if (!botSpawned || !bot.entity) return;
-
-    const mobs = Object.values(bot.entities).filter(e =>
-      e.type === 'mob' &&
-      hostileMobs.includes(e.name?.toLowerCase?.()) &&
-      bot.entity.position.distanceTo(e.position) < 16
-    );
-
-    if (mobs.length === 0) return;
-
-    const target = mobs[0];
-    equipWeapon();
-
-    bot.chat(`bunuh ${target.name} jap`);
-    bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
-
-    const attackInterval = setInterval(() => {
-      if (!target?.isValid || !bot.entity) {
-        clearInterval(attackInterval);
-        return;
-      }
-
-      const dist = bot.entity.position.distanceTo(target.position);
-      if (dist < 3) {
-        bot.lookAt(target.position.offset(0, target.height, 0)).then(() => {
-          bot.attack(target);
-        }).catch(() => {});
-      }
-    }, 600);
-  }
-
-  // 💥 NEW: React when attacked
-  bot.on('entityHurt', (entity) => {
-    if (entity.username === bot.username) return; // ignore if bot hurt itself somehow
-
-    const attacker = Object.values(bot.entities).find(e => {
-      if (!e.position || !e.metadata) return false;
-      const distance = bot.entity.position.distanceTo(e.position);
-      return distance < 6;
-    });
-
-    if (attacker && attacker.id !== bot.entity.id) {
-      retaliate(attacker);
-    }
-  });
-
-  function retaliate(attacker) {
-    equipWeapon();
-    bot.chat(`kau pukul aku? mari sini kau ${attacker.name || 'makhluk'}!`);
-    bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
-
-    const fight = setInterval(() => {
-      if (!attacker?.isValid || !bot.entity) {
-        clearInterval(fight);
-        return;
-      }
-
-      const dist = bot.entity.position.distanceTo(attacker.position);
-      if (dist < 3) {
-        bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
-          bot.attack(attacker);
-        }).catch(() => {});
-      }
-    }, 600);
-  }
-
-  setInterval(attackHostile, 3000);
-
-  bot.on('health', () => {
-    if (bot.health < lastHealth) {
-      bot.chat('sakitnyo');
-    }
-    lastHealth = bot.health;
-  });
-
   bot.on('chat', (username, message) => {
     if (!botSpawned) return;
 
@@ -123,7 +47,7 @@ function createBot() {
     if (msg === 'woi ikut aq') {
       followTarget = player.entity;
       following = true;
-      bot.chat("woof woof");
+      bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
 
@@ -156,7 +80,8 @@ function createBot() {
   }, 8000);
 
   const messages = [
-    "mne iman my love", "kaya siak server baru","bising bdo karina", "iqbal dh masok ke blom", "amirul hadif x nurul iman very very sweet good",
+    "mne iman my love", "kaya siak server baru", "piwit boleh bunuh zombie bagai siottt",
+    "lepasni aq jdi bodygard korg yehaww", "bising bdo karina", "amirul hadif x nurul iman very very sweet good",
     "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam", "duatiga duatiga dua empat",
     "boikot perempuan nme sofea pantek jubo lahanat", "bising do bal", "sat berak sat", "sunyi siak",
     "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
@@ -185,5 +110,59 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`🌐 Fake server listening on port ${port}`);
+  console.log(🌐 Fake server listening on port ${port});
 });
+
+// ADD THIS AT THE END of createBot() BEFORE createBot() ENDS
+
+  let lastAttacker = null;
+
+  bot.on('entityHurt', (entity) => {
+    if (!botSpawned || !entity || entity === bot.entity) return;
+
+    // Check if bot got hurt
+    const attacker = Object.values(bot.entities).find(e =>
+      e.type === 'player' || e.type === 'mob'
+    );
+
+    if (entity.uuid === bot.uuid && attacker) {
+      lastAttacker = attacker;
+      equipWeapon();
+      bot.chat(`yo tf? ${attacker.username || attacker.name}`);
+
+      bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+
+      const retaliate = setInterval(() => {
+        if (!attacker?.isValid || !bot.entity) {
+          clearInterval(retaliate);
+          return;
+        }
+
+        const dist = bot.entity.position.distanceTo(attacker.position);
+        if (dist < 3) {
+          bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
+            bot.attack(attacker);
+          }).catch(() => {});
+        }
+      }, 500);
+    }
+  });
+
+  // BERSERK MODE when low HP
+  bot.on('health', () => {
+    if (bot.health < 5 && lastAttacker && lastAttacker.isValid) {
+      bot.chat('ur goin too far dawg');
+      equipWeapon();
+
+      const spamAttack = setInterval(() => {
+        if (!lastAttacker?.isValid || !bot.entity || bot.health <= 0) {
+          clearInterval(spamAttack);
+          return;
+        }
+
+        bot.lookAt(lastAttacker.position.offset(0, lastAttacker.height, 0)).then(() => {
+          bot.attack(lastAttacker);
+        }).catch(() => {});
+      }, 200); // Fast attacks
+    }
+  });
