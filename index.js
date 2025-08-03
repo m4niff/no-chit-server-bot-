@@ -1,11 +1,4 @@
-const mineflayer = require('mineflayer');
-const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const { GoalFollow, GoalNear } = goals;
-const mcDataLoader = require('minecraft-data');
-
-let mcData;
-let following = false;
-let followTarget = null;
+// ... [your existing imports and variables] ...
 
 function createBot() {
   const bot = mineflayer.createBot({
@@ -75,6 +68,41 @@ function createBot() {
     }, 600);
   }
 
+  // 💥 NEW: React when attacked
+  bot.on('entityHurt', (entity) => {
+    if (entity.username === bot.username) return; // ignore if bot hurt itself somehow
+
+    const attacker = Object.values(bot.entities).find(e => {
+      if (!e.position || !e.metadata) return false;
+      const distance = bot.entity.position.distanceTo(e.position);
+      return distance < 6;
+    });
+
+    if (attacker && attacker.id !== bot.entity.id) {
+      retaliate(attacker);
+    }
+  });
+
+  function retaliate(attacker) {
+    equipWeapon();
+    bot.chat(`kau pukul aku? mari sini kau ${attacker.name || 'makhluk'}!`);
+    bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
+
+    const fight = setInterval(() => {
+      if (!attacker?.isValid || !bot.entity) {
+        clearInterval(fight);
+        return;
+      }
+
+      const dist = bot.entity.position.distanceTo(attacker.position);
+      if (dist < 3) {
+        bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
+          bot.attack(attacker);
+        }).catch(() => {});
+      }
+    }, 600);
+  }
+
   setInterval(attackHostile, 3000);
 
   bot.on('health', () => {
@@ -128,8 +156,7 @@ function createBot() {
   }, 8000);
 
   const messages = [
-    "mne iman my love", "kaya siak server baru", "piwit boleh bunuh zombie bagai siottt",
-    "lepasni aq jdi bodygard korg yehaww", "bising bdo karina", "amirul hadif x nurul iman very very sweet good",
+    "mne iman my love", "kaya siak server baru","bising bdo karina", "iqbal dh masok ke blom", "amirul hadif x nurul iman very very sweet good",
     "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam", "duatiga duatiga dua empat",
     "boikot perempuan nme sofea pantek jubo lahanat", "bising do bal", "sat berak sat", "sunyi siak",
     "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
