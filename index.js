@@ -32,7 +32,6 @@ function createBot() {
     defaultMove.canDig = false;
     defaultMove.blocksToAvoid.add(8);
     defaultMove.blocksToAvoid.add(9);
-
     bot.pathfinder.setMovements(defaultMove);
     console.log("✅ Bot spawned and ready.");
   });
@@ -49,7 +48,6 @@ function createBot() {
     if (!botSpawned) return;
     const player = bot.players[username];
     if (!player || !player.entity) return;
-
     const msg = message.toLowerCase();
     if (msg === 'woi ikut aq') {
       followTarget = player.entity;
@@ -57,7 +55,6 @@ function createBot() {
       bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
-
     if (msg === 'stop ikut') {
       following = false;
       followTarget = null;
@@ -72,7 +69,6 @@ function createBot() {
     }
   }, 3000);
 
-  // === Jump Randomly ===
   setInterval(() => {
     if (botSpawned && bot.setControlState) {
       bot.setControlState('jump', true);
@@ -80,7 +76,6 @@ function createBot() {
     }
   }, 10000);
 
-  // === Random Look Around ===
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -88,7 +83,6 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
-  // === Periodic Chat Messages ===
   const messages = [
     "mne iman my love", "kaya siak server baru", "piwit boleh bunuh zombie bagai siottt",
     "lepasni aq jdi bodygard korg yehaww", "bising bdo karina", "amirul hadif x nurul iman very very sweet good",
@@ -110,27 +104,22 @@ function createBot() {
   // === Retaliation System ===
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
-
-    // If bot was attacked
     if (entity.uuid === bot.uuid) {
       const attacker = Object.values(bot.entities).find(e =>
         e.position.distanceTo(bot.entity.position) < 4 &&
         (e.type === 'mob' || e.type === 'player') &&
         hostileMobs.includes(e.name)
       );
-
       if (attacker) {
         lastAttacker = attacker;
         equipWeapon();
         bot.chat(`yo tf? ${attacker.name}`);
         bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
-
         const retaliate = setInterval(() => {
           if (!attacker?.isValid || !bot.entity) {
             clearInterval(retaliate);
             return;
           }
-
           const dist = bot.entity.position.distanceTo(attacker.position);
           if (dist < 3) {
             bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
@@ -147,19 +136,45 @@ function createBot() {
     if (bot.health < 5 && lastAttacker && lastAttacker.isValid) {
       bot.chat('ur goin too far dawg');
       equipWeapon();
-
       const spamAttack = setInterval(() => {
         if (!lastAttacker?.isValid || !bot.entity || bot.health <= 0) {
           clearInterval(spamAttack);
           return;
         }
-
         bot.lookAt(lastAttacker.position.offset(0, lastAttacker.height, 0)).then(() => {
           bot.attack(lastAttacker);
         }).catch(() => {});
       }, 200);
     }
   });
+
+  // === Auto Hunt Nearby Mobs ===
+  setInterval(() => {
+    if (!botSpawned || bot.health <= 0) return;
+    const nearbyHostiles = Object.values(bot.entities).filter(e =>
+      e.type === 'mob' &&
+      hostileMobs.includes(e.name) &&
+      e.position.distanceTo(bot.entity.position) < 10
+    );
+    if (nearbyHostiles.length > 0) {
+      const target = nearbyHostiles[0];
+      lastAttacker = target;
+      equipWeapon();
+      bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
+      const attackLoop = setInterval(() => {
+        if (!target?.isValid || !bot.entity) {
+          clearInterval(attackLoop);
+          return;
+        }
+        const dist = bot.entity.position.distanceTo(target.position);
+        if (dist < 3) {
+          bot.lookAt(target.position.offset(0, target.height, 0)).then(() => {
+            bot.attack(target);
+          }).catch(() => {});
+        }
+      }, 500);
+    }
+  }, 5000);
 }
 
 createBot();
