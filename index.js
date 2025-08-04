@@ -20,6 +20,22 @@ const hostileMobs = [
   'vindication', 'ravager'
 ];
 
+// Helper: Get nearest entity matching a filter
+function getNearestEntity(filter) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const id in bot.entities) {
+    const entity = bot.entities[id];
+    if (!entity || !filter(entity)) continue;
+    const dist = bot.entity.position.distanceTo(entity.position);
+    if (dist < nearestDistance) {
+      nearest = entity;
+      nearestDistance = dist;
+    }
+  }
+  return nearest;
+}
+
 function equipWeapon() {
   const sword = bot.inventory?.items()?.find(item => item.name.includes('sword'));
   if (sword) bot.equip(sword, 'hand').catch(() => {});
@@ -43,7 +59,6 @@ function attackEntity(entity) {
 function stopBotActions() {
   try {
     if (bot?.pathfinder) bot.pathfinder.setGoal(null);
-    if (bot?.targetEntity) bot.targetEntity = null;
     bot.clearControlStates();
     clearInterval(roamInterval);
     roaming = false;
@@ -79,7 +94,7 @@ function createBot() {
 
   bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
 
-  bot.on('kicked', (reason, loggedIn) => {
+  bot.on('kicked', (reason) => {
     const message = reason?.toString() || "";
     console.log(`[KICKED] Reason: ${message}`);
     if (
@@ -137,7 +152,7 @@ function createBot() {
         bot.chat("sigma alpha wolf activateddd");
         roamInterval = setInterval(() => {
           if (!botSpawned || bot.health <= 0) return;
-          const mob = bot.nearestEntity(e =>
+          const mob = getNearestEntity(e =>
             e.type === 'mob' &&
             hostileMobs.includes(e.name) &&
             e.position.distanceTo(bot.entity.position) < 16
@@ -204,7 +219,7 @@ function createBot() {
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
-      const attacker = Object.values(bot.entities).find(e =>
+      const attacker = getNearestEntity(e =>
         e.type === 'mob' &&
         e.position.distanceTo(bot.entity.position) < 4
       );
@@ -225,7 +240,7 @@ function createBot() {
 
   setInterval(() => {
     if (!botSpawned || roaming || bot.health <= 0) return;
-    const target = bot.nearestEntity(e =>
+    const target = getNearestEntity(e =>
       e.type === 'mob' &&
       hostileMobs.includes(e.name) &&
       e.position.distanceTo(bot.entity.position) < 12
