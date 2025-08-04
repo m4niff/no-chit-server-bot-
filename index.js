@@ -1,9 +1,11 @@
+// == IMPORTS ==
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const { GoalFollow, GoalNear, GoalBlock } = goals;
 const mcDataLoader = require('minecraft-data');
 const express = require('express');
 
+// == STATE VARS ==
 let bot;
 let mcData;
 let following = false;
@@ -12,7 +14,7 @@ let defaultMove;
 let botSpawned = false;
 let lastAttacker = null;
 let roaming = false;
-let roamInterval;
+let roamInterval = null;
 let currentTarget = null;
 let attackInterval = null;
 
@@ -22,6 +24,7 @@ const hostileMobs = [
   'pillager', 'evoker', 'vindication', 'ravager'
 ];
 
+// == UTILITIES ==
 function getNearestEntity(filter) {
   let nearest = null;
   let nearestDistance = Infinity;
@@ -42,16 +45,18 @@ function equipWeapon() {
   if (sword) bot.equip(sword, 'hand').catch(() => {});
 }
 
+// ✅ Clean & safe attack logic
 function attackEntity(entity) {
   if (!entity || !entity.isValid || bot.health <= 0) return;
+  if (currentTarget?.uuid === entity.uuid) return;
 
-  if (attackInterval) clearInterval(attackInterval);
+  clearInterval(attackInterval);
   equipWeapon();
   currentTarget = entity;
   bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
 
   attackInterval = setInterval(() => {
-    if (!entity?.isValid || !bot.entity || bot.health <= 0) {
+    if (!entity?.isValid || bot.health <= 0) {
       clearInterval(attackInterval);
       attackInterval = null;
       currentTarget = null;
@@ -76,10 +81,12 @@ function stopBotActions() {
     clearInterval(roamInterval);
     clearInterval(attackInterval);
     attackInterval = null;
+    roamInterval = null;
     currentTarget = null;
     roaming = false;
     following = false;
     followTarget = null;
+    lastAttacker = null;
     console.log("🛌 Bot actions stopped.");
   } catch (_) {}
 }
@@ -90,6 +97,7 @@ function shutdownBotImmediately() {
   process.exit(0);
 }
 
+// == BOT CREATION ==
 function createBot() {
   console.log('🔄 Creating bot...');
   bot = mineflayer.createBot({
@@ -154,6 +162,7 @@ function createBot() {
     }, 5000);
   });
 
+  // == CHAT COMMANDS ==
   bot.on('chat', (username, message) => {
     if (!botSpawned) return;
     const player = bot.players[username];
@@ -169,9 +178,7 @@ function createBot() {
     }
 
     if (msg === 'stop ikut') {
-      following = false;
-      followTarget = null;
-      bot.pathfinder.setGoal(null);
+      stopBotActions();
       bot.chat("yeahyeah im a goodboy");
     }
 
@@ -182,14 +189,16 @@ function createBot() {
         bot.chat("sigma alpha wolf activateddd");
         roamInterval = setInterval(() => {
           if (!botSpawned || bot.health <= 0) return;
+
           const mob = getNearestEntity(e =>
             e.type === 'mob' &&
             hostileMobs.includes(e.name) &&
             e.position.distanceTo(bot.entity.position) < 16
           );
+
           if (mob) {
             attackEntity(mob);
-          } else {
+          } else if (!currentTarget) {
             const dx = Math.floor(Math.random() * 10 - 5);
             const dz = Math.floor(Math.random() * 10 - 5);
             const pos = bot.entity.position.offset(dx, 0, dz);
@@ -200,16 +209,12 @@ function createBot() {
     }
 
     if (msg === 'stop cari monster') {
-      if (roaming) {
-        roaming = false;
-        clearInterval(roamInterval);
-        bot.pathfinder.setGoal(null);
-        bot.chat("no problem, u can ask me for help anytime..");
-      }
+      stopBotActions();
+      bot.chat("no problem, u can ask me for help anytime..");
     }
   });
 
-  // Follow target behavior loop
+  // == FOLLOW BEHAVIOR ==
   setInterval(() => {
     if (following && followTarget && botSpawned) {
       const nearbyMob = getNearestEntity(e =>
@@ -225,7 +230,7 @@ function createBot() {
     }
   }, 3000);
 
-  // Jump in water
+  // == WATER JUMP ==
   setInterval(() => {
     if (botSpawned && bot.entity?.isInWater) {
       bot.setControlState('jump', true);
@@ -233,7 +238,7 @@ function createBot() {
     }
   }, 2000);
 
-  // Look around randomly
+  // == LOOK AROUND RANDOMLY ==
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -241,7 +246,7 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
-  // Random chat
+  // == CHAT SPAM ==
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good",
@@ -252,7 +257,6 @@ function createBot() {
     "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
   ];
   let index = 0;
-
   setInterval(() => {
     if (botSpawned) {
       try {
@@ -262,7 +266,7 @@ function createBot() {
     }
   }, 90000);
 
-  // Auto defend when attacked
+  // == DEFENSE ==
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
@@ -284,7 +288,7 @@ function createBot() {
     }
   });
 
-  // Passive mob detection
+  // == PASSIVE SCAN ==
   setInterval(() => {
     if (!botSpawned || roaming || bot.health <= 0) return;
     const target = getNearestEntity(e =>
@@ -301,12 +305,10 @@ function createBot() {
 
 createBot();
 
-// Fake express server to keep hosting platforms alive
+// == FAKE SERVER TO KEEP ALIVE ==
 const app = express();
 const port = process.env.PORT || 3000;
-app.get('/', (req, res) => {
-  res.send('Mineflayer bot is running!');
-});
+app.get('/', (req, res) => res.send('Mineflayer bot is running!'));
 app.listen(port, () => {
   console.log(`🌐 Fake server listening on port ${port}`);
 });
