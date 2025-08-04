@@ -21,7 +21,7 @@ let attackInterval = null;
 const hostileMobs = [
   'zombie', 'drowned', 'skeleton', 'creeper', 'spider', 'husk',
   'witch', 'zombified_piglin', 'zoglin', 'phantom', 'vex',
-  'pillager', 'evoker', 'vindication', 'ravager'
+  'pillager', 'evoker', 'vindicator', 'ravager'
 ];
 
 // == UTILITIES ==
@@ -46,12 +46,13 @@ function equipWeapon() {
 }
 
 function attackEntity(entity) {
-  if (!entity || !entity.isValid || bot.health <= 0) return;
+  if (!entity?.isValid || bot.health <= 0) return;
   if (currentTarget?.uuid === entity.uuid) return;
 
   clearInterval(attackInterval);
   equipWeapon();
   currentTarget = entity;
+
   bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
 
   attackInterval = setInterval(() => {
@@ -63,14 +64,14 @@ function attackEntity(entity) {
     }
 
     const dist = bot.entity.position.distanceTo(entity.position);
-    if (dist < 3) {
-      bot.lookAt(entity.position.offset(0, entity.height, 0)).then(() => {
-        bot.attack(entity);
-      }).catch(() => {});
+    if (dist < 3 && bot.canSeeEntity(entity)) {
+      bot.lookAt(entity.position.offset(0, entity.height, 0))
+        .then(() => bot.attack(entity))
+        .catch(() => {});
     } else {
       bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
     }
-  }, 500);
+  }, 800);
 }
 
 function stopBotActions() {
@@ -115,8 +116,8 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8); // water
-    defaultMove.blocksToAvoid.add(9); // water
+    defaultMove.blocksToAvoid.add(8);
+    defaultMove.blocksToAvoid.add(9);
     bot.pathfinder.setMovements(defaultMove);
   });
 
@@ -142,7 +143,8 @@ function createBot() {
       msg.includes("banned") ||
       msg.includes("kicked") ||
       msg.includes("duplicate") ||
-      msg.includes("connection reset")
+      msg.includes("connection reset") ||
+      msg.includes("read error")
     ) {
       shutdownBotImmediately();
     }
@@ -155,9 +157,12 @@ function createBot() {
 
   bot.on('death', () => {
     console.log("☠️ Bot died. Respawning in 5 seconds...");
+    stopBotActions();
     setTimeout(() => {
-      if (bot) bot.emit('respawn');
-      console.log("🔄 Bot respawned.");
+      if (bot.health <= 0) {
+        bot.emit('respawn');
+        console.log("🔄 Bot respawned.");
+      }
     }, 5000);
   });
 
@@ -237,10 +242,10 @@ function createBot() {
     }
   }, 2000);
 
-  // == LOOK AROUND RANDOMLY ==
+  // == LOOK AROUND ==
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
-    const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
+    const yaw = Math.random() * Math.PI * 2;
     const pitch = (Math.random() - 0.5) * Math.PI / 4;
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
@@ -304,7 +309,7 @@ function createBot() {
 
 createBot();
 
-// == FAKE SERVER TO KEEP ALIVE ==
+// == KEEP ALIVE ==
 const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Mineflayer bot is running!'));
