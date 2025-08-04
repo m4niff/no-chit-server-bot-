@@ -25,6 +25,23 @@ function equipWeapon() {
   if (sword) bot.equip(sword, 'hand').catch(() => {});
 }
 
+function attackEntity(entity) {
+  if (!entity || !entity.isValid) return;
+
+  equipWeapon();
+  bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
+
+  const attackLoop = setInterval(() => {
+    if (!entity?.isValid || !bot.entity) return clearInterval(attackLoop);
+    const dist = bot.entity.position.distanceTo(entity.position);
+    if (dist < 3) {
+      bot.lookAt(entity.position.offset(0, entity.height, 0)).then(() => {
+        bot.attack(entity);
+      }).catch(() => {});
+    }
+  }, 500);
+}
+
 function createBot() {
   console.log('🔄 Creating bot...');
   bot = mineflayer.createBot({
@@ -88,27 +105,18 @@ function createBot() {
       if (!roaming) {
         roaming = true;
         bot.chat("sigma alpha wolf activateddd");
+
         roamInterval = setInterval(() => {
           if (!botSpawned || bot.health <= 0) return;
 
-          const mob = bot.nearestEntity(entity =>
-            entity.type === 'mob' &&
-            hostileMobs.includes(entity.name) &&
-            entity.position.distanceTo(bot.entity.position) < 16
+          const mob = bot.nearestEntity(e =>
+            e.type === 'mob' &&
+            hostileMobs.includes(e.name) &&
+            e.position.distanceTo(bot.entity.position) < 16
           );
 
           if (mob) {
-            equipWeapon();
-            bot.pathfinder.setGoal(new GoalNear(mob.position.x, mob.position.y, mob.position.z, 1));
-            const attackLoop = setInterval(() => {
-              if (!mob?.isValid || !bot.entity) return clearInterval(attackLoop);
-              const dist = bot.entity.position.distanceTo(mob.position);
-              if (dist < 3) {
-                bot.lookAt(mob.position.offset(0, mob.height, 0)).then(() => {
-                  bot.attack(mob);
-                }).catch(() => {});
-              }
-            }, 500);
+            attackEntity(mob);
           } else {
             const dx = Math.floor(Math.random() * 10 - 5);
             const dz = Math.floor(Math.random() * 10 - 5);
@@ -136,11 +144,11 @@ function createBot() {
   }, 3000);
 
   setInterval(() => {
-    if (botSpawned && bot.setControlState) {
+    if (botSpawned && bot.entity?.isInWater) {
       bot.setControlState('jump', true);
       setTimeout(() => bot.setControlState('jump', false), 500);
     }
-  }, 10000);
+  }, 2000);
 
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
@@ -170,23 +178,13 @@ function createBot() {
     if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
       const attacker = Object.values(bot.entities).find(e =>
-        e.position.distanceTo(bot.entity.position) < 4 &&
-        (e.type === 'mob' || e.type === 'player') &&
-        hostileMobs.includes(e.name)
+        e.type === 'mob' &&
+        e.position.distanceTo(bot.entity.position) < 4
       );
       if (attacker) {
         lastAttacker = attacker;
-        equipWeapon();
         bot.chat(`yo tf? ${attacker.name}`);
-        bot.pathfinder.setGoal(new GoalNear(attacker.position.x, attacker.position.y, attacker.position.z, 1));
-        const retaliate = setInterval(() => {
-          if (!attacker?.isValid || !bot.entity) return clearInterval(retaliate);
-          if (bot.entity.position.distanceTo(attacker.position) < 3) {
-            bot.lookAt(attacker.position.offset(0, attacker.height, 0)).then(() => {
-              bot.attack(attacker);
-            }).catch(() => {});
-          }
-        }, 500);
+        attackEntity(attacker);
       }
     }
   });
@@ -194,38 +192,22 @@ function createBot() {
   bot.on('health', () => {
     if (bot.health < 5 && lastAttacker?.isValid) {
       bot.chat('ur goin too far dawg');
-      equipWeapon();
-      const spamAttack = setInterval(() => {
-        if (!lastAttacker?.isValid || bot.health <= 0) return clearInterval(spamAttack);
-        bot.lookAt(lastAttacker.position.offset(0, lastAttacker.height, 0)).then(() => {
-          bot.attack(lastAttacker);
-        }).catch(() => {});
-      }, 200);
+      attackEntity(lastAttacker);
     }
   });
 
   setInterval(() => {
-    if (!botSpawned || bot.health <= 0) return;
+    if (!botSpawned || roaming || bot.health <= 0) return;
 
-    const target = bot.nearestEntity(entity =>
-      entity.type === 'mob' &&
-      hostileMobs.includes(entity.name) &&
-      entity.position.distanceTo(bot.entity.position) < 12
+    const target = bot.nearestEntity(e =>
+      e.type === 'mob' &&
+      hostileMobs.includes(e.name) &&
+      e.position.distanceTo(bot.entity.position) < 12
     );
 
     if (target) {
       lastAttacker = target;
-      equipWeapon();
-      bot.pathfinder.setGoal(new GoalNear(target.position.x, target.position.y, target.position.z, 1));
-      const attackLoop = setInterval(() => {
-        if (!target?.isValid || !bot.entity) return clearInterval(attackLoop);
-        const dist = bot.entity.position.distanceTo(target.position);
-        if (dist < 3) {
-          bot.lookAt(target.position.offset(0, target.height, 0)).then(() => {
-            bot.attack(target);
-          }).catch(() => {});
-        }
-      }, 500);
+      attackEntity(target);
     }
   }, 3000);
 }
