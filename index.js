@@ -17,6 +17,7 @@ let currentTarget = null;
 let attackInterval = null;
 let lastAttacker = null;
 let fatalError = false;
+let messageInterval = null;
 
 // == HOSTILE MOBS ==
 const hostileMobs = [
@@ -94,7 +95,12 @@ function createBot() {
   bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
 
   function checkDisconnect(reason) {
-    const msg = typeof reason === 'string' ? reason.toLowerCase() : '';
+    let msg = '';
+    try {
+      if (typeof reason === 'string') msg = reason.toLowerCase();
+      else if (typeof reason === 'object' && reason?.text) msg = reason.text.toLowerCase();
+    } catch (_) {}
+
     console.log(`❌ Disconnect reason: ${msg}`);
 
     const isFatal = msg.includes("kicked") || msg.includes("banned") ||
@@ -109,6 +115,7 @@ function createBot() {
   }
 
   bot.on('kicked', checkDisconnect);
+
   bot.on('error', err => {
     console.log("❗ Bot error:", err.message);
     checkDisconnect(err.message);
@@ -116,7 +123,15 @@ function createBot() {
 
   bot.on('end', () => {
     console.log("🔌 Bot disconnected.");
-    if (!fatalError) setTimeout(createBot, 5000);
+    clearInterval(attackInterval);
+    clearInterval(messageInterval);
+    attackInterval = null;
+    currentTarget = null;
+    botSpawned = false;
+
+    if (!fatalError) {
+      setTimeout(createBot, 5000);
+    }
   });
 
   bot.on('death', () => {
@@ -209,9 +224,10 @@ function createBot() {
     "apa ko bob", "okok ma bad ma fault gng🥀", "sat berak sat", "sunyi siak",
     "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
   ];
+
   let chatIndex = 0;
-  setInterval(() => {
-    if (botSpawned) {
+  messageInterval = setInterval(() => {
+    if (botSpawned && bot.health > 0) {
       try {
         bot.chat(messages[chatIndex]);
         chatIndex = (chatIndex + 1) % messages.length;
