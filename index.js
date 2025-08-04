@@ -43,17 +43,15 @@ function equipWeapon() {
 }
 
 function attackEntity(entity) {
-  if (!entity || !entity.isValid) return;
-  if (currentTarget === entity) return;
-  if (attackInterval) clearInterval(attackInterval);
+  if (!entity || !entity.isValid || bot.health <= 0) return;
 
+  if (attackInterval) clearInterval(attackInterval);
   equipWeapon();
   currentTarget = entity;
-
   bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
 
   attackInterval = setInterval(() => {
-    if (!entity?.isValid || !bot.entity) {
+    if (!entity?.isValid || !bot.entity || bot.health <= 0) {
       clearInterval(attackInterval);
       attackInterval = null;
       currentTarget = null;
@@ -73,10 +71,10 @@ function attackEntity(entity) {
 
 function stopBotActions() {
   try {
-    if (bot?.pathfinder) bot.pathfinder.setGoal(null);
+    bot.pathfinder.setGoal(null);
     bot.clearControlStates();
     clearInterval(roamInterval);
-    if (attackInterval) clearInterval(attackInterval);
+    clearInterval(attackInterval);
     attackInterval = null;
     currentTarget = null;
     roaming = false;
@@ -163,6 +161,7 @@ function createBot() {
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq') {
+      stopBotActions();
       followTarget = player.entity;
       following = true;
       bot.chat("sat");
@@ -178,6 +177,7 @@ function createBot() {
 
     if (msg === 'wei gi bunuh monster') {
       if (!roaming) {
+        stopBotActions();
         roaming = true;
         bot.chat("sigma alpha wolf activateddd");
         roamInterval = setInterval(() => {
@@ -209,12 +209,23 @@ function createBot() {
     }
   });
 
+  // Follow target behavior loop
   setInterval(() => {
     if (following && followTarget && botSpawned) {
-      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
+      const nearbyMob = getNearestEntity(e =>
+        e.type === 'mob' &&
+        hostileMobs.includes(e.name) &&
+        e.position.distanceTo(bot.entity.position) < 8
+      );
+      if (nearbyMob) {
+        attackEntity(nearbyMob);
+      } else {
+        bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
+      }
     }
   }, 3000);
 
+  // Jump in water
   setInterval(() => {
     if (botSpawned && bot.entity?.isInWater) {
       bot.setControlState('jump', true);
@@ -222,6 +233,7 @@ function createBot() {
     }
   }, 2000);
 
+  // Look around randomly
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = bot.entity.yaw + ((Math.random() - 0.5) * Math.PI / 2);
@@ -229,6 +241,7 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
+  // Random chat
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good",
@@ -249,6 +262,7 @@ function createBot() {
     }
   }, 90000);
 
+  // Auto defend when attacked
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
@@ -270,6 +284,7 @@ function createBot() {
     }
   });
 
+  // Passive mob detection
   setInterval(() => {
     if (!botSpawned || roaming || bot.health <= 0) return;
     const target = getNearestEntity(e =>
@@ -286,7 +301,7 @@ function createBot() {
 
 createBot();
 
-// Fake express server (optional)
+// Fake express server to keep hosting platforms alive
 const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => {
