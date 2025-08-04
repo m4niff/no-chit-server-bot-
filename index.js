@@ -27,8 +27,23 @@ bot.pathfinder.setMovements(defaultMove);
 
 bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
 
-bot.on('kicked', (reason) => { console.log('❌ Bot was kicked:', reason); stopBotActions(); const msg = reason?.toString()?.toLowerCase(); if (msg?.includes('logged in from another location')) { console.log("🛑 Duplicate login detected. Bot will shut down."); process.exit(); } else { console.log("♻️ Reconnecting in 10 seconds..."); setTimeout(createBot, 10000); } });
+bot.on('kicked', (reason, loggedIn) => {
+  const message = reason?.toString() || "";
 
+  console.log(`[KICKED] Reason: ${message}`);
+
+  if (
+    message.includes('You logged in from another location') ||
+    message.includes('Kicked by an operator')
+  ) {
+    console.log('Shutting down: Kicked for session conflict or by operator.');
+    process.exit();
+  } else {
+    console.log('Reconnecting in 10 seconds...');
+    setTimeout(createBot, 10000);
+  }
+});
+                      
 bot.on('error', err => console.log("❗ Bot error:", err.message));
 
 bot.on('end', () => { console.log("🔌 Bot disconnected."); stopBotActions(); console.log("♻️ Reconnecting in 10 seconds..."); setTimeout(createBot, 10000); });
