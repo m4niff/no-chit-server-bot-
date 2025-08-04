@@ -86,16 +86,15 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8); // Avoid water
+    defaultMove.blocksToAvoid.add(8);
     defaultMove.blocksToAvoid.add(9);
     bot.pathfinder.setMovements(defaultMove);
   });
 
   bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
 
-  // == DISCONNECT / KICK HANDLING ==
   function checkDisconnect(reason) {
-    const msg = (reason || '').toLowerCase();
+    const msg = typeof reason === 'string' ? reason.toLowerCase() : '';
     console.log(`❌ Disconnect reason: ${msg}`);
 
     const isFatal = msg.includes("kicked") || msg.includes("banned") ||
@@ -120,7 +119,6 @@ function createBot() {
     if (!fatalError) setTimeout(createBot, 5000);
   });
 
-  // == DEATH ==
   bot.on('death', () => {
     console.log("☠️ Bot died. Respawning in 5s...");
     clearInterval(attackInterval);
@@ -133,7 +131,6 @@ function createBot() {
     }, 5000);
   });
 
-  // == CHAT COMMANDS ==
   bot.on('chat', (username, message) => {
     if (!botSpawned) return;
     const player = bot.players[username]?.entity;
@@ -174,7 +171,6 @@ function createBot() {
     }
   });
 
-  // == DEFENSE / FOLLOW LOOP ==
   setInterval(() => {
     if (!botSpawned) return;
 
@@ -191,7 +187,6 @@ function createBot() {
     }
   }, 3000);
 
-  // == ESCAPE WATER ==
   setInterval(() => {
     if (botSpawned && bot.entity?.isInWater) {
       bot.setControlState('jump', true);
@@ -199,7 +194,6 @@ function createBot() {
     }
   }, 2000);
 
-  // == RANDOM LOOK ==
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = Math.random() * Math.PI * 2;
@@ -207,7 +201,6 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
-  // == RANDOM CHAT ==
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
@@ -226,7 +219,6 @@ function createBot() {
     }
   }, 90000);
 
-  // == HIT REACTION ==
   bot.on('entityHurt', (entity) => {
     if (entity.uuid === bot.uuid) {
       const attacker = getNearestEntity(e =>
