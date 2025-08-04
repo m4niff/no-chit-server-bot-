@@ -5,7 +5,7 @@ const { GoalFollow, GoalNear, GoalBlock } = goals;
 const mcDataLoader = require('minecraft-data');
 const express = require('express');
 
-// == STATE VARS ==
+// == STATE ==
 let bot;
 let mcData;
 let following = false;
@@ -17,6 +17,7 @@ let roaming = false;
 let currentTarget = null;
 let attackInterval = null;
 
+// == HOSTILE MOBS ==
 const hostileMobs = [
   'zombie', 'drowned', 'skeleton', 'creeper', 'spider', 'husk',
   'witch', 'zombified_piglin', 'zoglin', 'phantom', 'vex',
@@ -25,18 +26,11 @@ const hostileMobs = [
 
 // == UTILITIES ==
 function getNearestEntity(filter) {
-  let nearest = null;
-  let nearestDistance = Infinity;
-  for (const id in bot.entities) {
-    const entity = bot.entities[id];
-    if (!entity || !filter(entity)) continue;
-    const dist = bot.entity.position.distanceTo(entity.position);
-    if (dist < nearestDistance) {
-      nearest = entity;
-      nearestDistance = dist;
-    }
-  }
-  return nearest;
+  return Object.values(bot.entities)
+    .filter(filter)
+    .sort((a, b) =>
+      bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position)
+    )[0];
 }
 
 function equipWeapon() {
@@ -46,7 +40,8 @@ function equipWeapon() {
 
 function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
-  if (currentTarget?.uuid === entity.uuid) return;
+
+  if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
   clearInterval(attackInterval);
   equipWeapon();
@@ -73,7 +68,7 @@ function attackEntity(entity) {
   }, 800);
 }
 
-// == BOT CREATION ==
+// == CREATE BOT ==
 function createBot() {
   console.log('🔄 Creating bot...');
   bot = mineflayer.createBot({
@@ -92,47 +87,47 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8);
+    defaultMove.blocksToAvoid.add(8); // water
     defaultMove.blocksToAvoid.add(9);
     bot.pathfinder.setMovements(defaultMove);
   });
 
   bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
 
-  bot.on('kicked', (reason) => {
-    const message = reason?.toString().toLowerCase() || "";
-    console.log(`[KICKED] Reason: ${message}`);
-    if (
-      message.includes("banned") ||
-      message.includes("kicked by an operator") ||
-      message.includes("you logged in from another location") ||
-      message.includes("duplicate login")
-    ) {
-      process.exit();
-    }
-  });
-
-  bot.on('error', err => {
-    const msg = err.message.toLowerCase();
-    console.log("❗ Bot error:", err.message);
+  // == HANDLING BANNED / KICKED / DUPLICATE LOGIN ==
+  function checkDisconnect(reason) {
+    const msg = reason?.toString().toLowerCase() || '';
+    console.log(`❌ Disconnect reason: ${msg}`);
     if (
       msg.includes("banned") ||
-      msg.includes("kicked") ||
-      msg.includes("duplicate") ||
+      msg.includes("kicked by an operator") ||
+      msg.includes("you logged in from another location") ||
+      msg.includes("duplicate login") ||
       msg.includes("connection reset") ||
       msg.includes("read error")
     ) {
-      process.exit();
+      console.log("❌ Fatal disconnect. Shutting down.");
+      process.exit(1);
     }
-  });
+  }
 
+  bot.on('kicked', checkDisconnect);
+  bot.on('error', err => {
+    console.log("❗ Bot error:", err.message);
+    checkDisconnect(err.message);
+  });
   bot.on('end', () => {
     console.log("🔌 Bot disconnected.");
-    process.exit();
+    process.exit(1);
   });
 
+  // == DEATH ==
   bot.on('death', () => {
-    console.log("☠️ Bot died. Respawning in 5 seconds...");
+    console.log("☠️ Bot died. Respawning in 5s...");
+    clearInterval(attackInterval);
+    attackInterval = null;
+    currentTarget = null;
+
     setTimeout(() => {
       bot.emit('respawn');
       console.log("🔄 Bot respawned.");
@@ -144,6 +139,7 @@ function createBot() {
     if (!botSpawned) return;
     const player = bot.players[username];
     if (!player || !player.entity) return;
+
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq') {
@@ -157,6 +153,7 @@ function createBot() {
       if (!roaming) {
         roaming = true;
         bot.chat("sigma alpha wolf activateddd");
+
         setInterval(() => {
           if (!botSpawned || bot.health <= 0) return;
 
@@ -179,36 +176,24 @@ function createBot() {
     }
   });
 
-  // == FOLLOW & DEFENSE ==
+  // == DEFENSE + FOLLOW COMBINED ==
   setInterval(() => {
     if (!botSpawned) return;
 
-    // Passive attack nearby mobs always
-    const passiveTarget = getNearestEntity(e =>
+    const closeMob = getNearestEntity(e =>
       e.type === 'mob' &&
       hostileMobs.includes(e.name) &&
       e.position.distanceTo(bot.entity.position) < 12
     );
-    if (passiveTarget) {
-      attackEntity(passiveTarget);
-    }
 
-    // Follow target if set
-    if (following && followTarget) {
-      const closeMob = getNearestEntity(e =>
-        e.type === 'mob' &&
-        hostileMobs.includes(e.name) &&
-        e.position.distanceTo(bot.entity.position) < 8
-      );
-      if (closeMob) {
-        attackEntity(closeMob);
-      } else {
-        bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
-      }
+    if (closeMob) {
+      attackEntity(closeMob);
+    } else if (following && followTarget) {
+      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
   }, 3000);
 
-  // == WATER JUMP ==
+  // == ESCAPE WATER ==
   setInterval(() => {
     if (botSpawned && bot.entity?.isInWater) {
       bot.setControlState('jump', true);
@@ -216,7 +201,7 @@ function createBot() {
     }
   }, 2000);
 
-  // == LOOK AROUND ==
+  // == RANDOM LOOK AROUND ==
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = Math.random() * Math.PI * 2;
@@ -244,7 +229,7 @@ function createBot() {
     }
   }, 90000);
 
-  // == DEFENSE ==
+  // == ATTACK ON HIT ==
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
@@ -272,7 +257,7 @@ createBot();
 // == KEEP ALIVE ==
 const app = express();
 const port = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Mineflayer bot is running!'));
+app.get('/', (_, res) => res.send('Mineflayer bot is running!'));
 app.listen(port, () => {
   console.log(`🌐 Fake server listening on port ${port}`);
 });
