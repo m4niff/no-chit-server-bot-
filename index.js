@@ -42,6 +42,19 @@ function attackEntity(entity) {
   }, 500);
 }
 
+function stopBotActions() {
+  try {
+    if (bot?.pathfinder) bot.pathfinder.setGoal(null);
+    if (bot?.targetEntity) bot.targetEntity = null;
+    bot.clearControlStates();
+    clearInterval(roamInterval);
+    roaming = false;
+    following = false;
+    followTarget = null;
+    console.log("🛑 Bot actions stopped.");
+  } catch (_) {}
+}
+
 function createBot() {
   console.log('🔄 Creating bot...');
   bot = mineflayer.createBot({
@@ -67,9 +80,19 @@ function createBot() {
   });
 
   bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
+
+  bot.on('kicked', (reason) => {
+    console.log('❌ Bot was kicked:', reason);
+    if (reason && reason.toString().includes('logged in from another location')) {
+      stopBotActions();
+    }
+  });
+
   bot.on('error', err => console.log("❗ Bot error:", err.message));
+
   bot.on('end', () => {
     console.log("🔌 Bot disconnected. Reconnecting in 30 seconds...");
+    stopBotActions();
     setTimeout(createBot, 30000);
   });
 
@@ -170,7 +193,7 @@ function createBot() {
       try {
         bot.chat(messages[index]);
         index = (index + 1) % messages.length;
-      } catch (e) {}
+      } catch (_) {}
     }
   }, 90000);
 
