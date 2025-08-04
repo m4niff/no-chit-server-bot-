@@ -10,14 +10,13 @@ let bot;
 let mcData;
 let botSpawned = false;
 let followTarget = null;
-let following = false;
 let defaultMove;
-let roaming = false;
 let currentTarget = null;
 let attackInterval = null;
 let lastAttacker = null;
 let fatalError = false;
 let messageInterval = null;
+let roamInterval = null;
 
 // == HOSTILE MOBS ==
 const hostileMobs = [
@@ -34,8 +33,8 @@ function getNearestEntity(filter) {
 }
 
 function equipWeapon() {
-  const sword = bot.inventory.items().find(item => item.name.includes('sword'));
-  if (sword) bot.equip(sword, 'hand').catch(() => {});
+  const weapon = bot.inventory.items().find(i => i.name.includes('sword') || i.name.includes('axe'));
+  if (weapon) bot.equip(weapon, 'hand').catch(() => {});
 }
 
 function attackEntity(entity) {
@@ -43,25 +42,24 @@ function attackEntity(entity) {
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
   clearInterval(attackInterval);
-  equipWeapon();
   currentTarget = entity;
+  equipWeapon();
 
   bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
 
   attackInterval = setInterval(() => {
     if (!entity?.isValid || bot.health <= 0) {
       clearInterval(attackInterval);
+      attackInterval = null;
       currentTarget = null;
       return;
     }
 
     const dist = bot.entity.position.distanceTo(entity.position);
     if (dist < 3 && bot.canSeeEntity(entity)) {
-      bot.lookAt(entity.position.offset(0, entity.height, 0))
-        .then(() => bot.attack(entity))
-        .catch(() => {});
-    } else {
-      bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
+      bot.lookAt(entity.position.offset(0, entity.height, 0)).then(() => {
+        bot.attack(entity);
+      }).catch(() => {});
     }
   }, 800);
 }
@@ -70,7 +68,7 @@ function attackEntity(entity) {
 function createBot() {
   if (fatalError) return;
 
-  console.log('🔄 Creating bot...');
+  console.log("🔄 Creating bot...");
   bot = mineflayer.createBot({
     host: 'neymar.aternos.me',
     port: 48991,
@@ -84,6 +82,7 @@ function createBot() {
     console.log("✅ Bot spawned and ready.");
     botSpawned = true;
     mcData = mcDataLoader(bot.version);
+
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
@@ -92,16 +91,11 @@ function createBot() {
     bot.pathfinder.setMovements(defaultMove);
   });
 
-  bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
+  bot.on('login', () => console.log("🔓 Logged in to server."));
 
   function checkDisconnect(reason) {
-    let msg = '';
-    try {
-      if (typeof reason === 'string') msg = reason.toLowerCase();
-      else if (typeof reason === 'object' && reason?.text) msg = reason.text.toLowerCase();
-    } catch (_) {}
-
-    console.log(`❌ Disconnect reason: ${msg}`);
+    const msg = typeof reason === 'string' ? reason.toLowerCase() : JSON.stringify(reason).toLowerCase();
+    console.log("❌ Disconnect reason:", msg);
 
     const isFatal = msg.includes("kicked") || msg.includes("banned") ||
       msg.includes("another location") || msg.includes("duplicate") ||
@@ -109,23 +103,22 @@ function createBot() {
 
     if (isFatal) {
       fatalError = true;
-      console.log("❌ Fatal disconnect. Not reconnecting.");
+      console.log("🛑 Fatal disconnect. Not reconnecting.");
       process.exit(1);
     }
   }
 
   bot.on('kicked', checkDisconnect);
-
   bot.on('error', err => {
-    console.log("❗ Bot error:", err.message);
+    console.log("⚠️ Bot error:", err.message);
     checkDisconnect(err.message);
   });
 
   bot.on('end', () => {
-    console.log("🔌 Bot disconnected.");
+    console.log("🔌 Disconnected.");
     clearInterval(attackInterval);
+    clearInterval(roamInterval);
     clearInterval(messageInterval);
-    attackInterval = null;
     currentTarget = null;
     botSpawned = false;
 
@@ -135,38 +128,32 @@ function createBot() {
   });
 
   bot.on('death', () => {
-    console.log("☠️ Bot died. Respawning in 5s...");
+    console.log("☠️ Bot died. Respawning soon...");
     clearInterval(attackInterval);
-    attackInterval = null;
     currentTarget = null;
 
     setTimeout(() => {
-      bot.emit('respawn');
-      console.log("🔄 Bot respawned.");
+      if (botSpawned) bot.emit('respawn');
     }, 5000);
   });
 
+  // == CHAT EVENTS ==
   bot.on('chat', (username, message) => {
     if (!botSpawned) return;
     const player = bot.players[username]?.entity;
-    if (!player) return;
     const msg = message.toLowerCase();
 
-    if (msg === 'woi ikut aq') {
+    if (msg === 'woi ikut aq' && player) {
       followTarget = player;
-      following = true;
       bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
 
     if (msg === 'woi gi bunuh') {
-      if (!roaming) {
-        roaming = true;
+      if (!roamInterval) {
         bot.chat("sigma alpha wolf activateddd");
-
-        setInterval(() => {
+        roamInterval = setInterval(() => {
           if (!botSpawned || bot.health <= 0) return;
-
           const mob = getNearestEntity(e =>
             e.type === 'mob' &&
             hostileMobs.includes(e.name) &&
@@ -184,8 +171,18 @@ function createBot() {
         }, 4000);
       }
     }
+
+    // ✅ Optional: AI-style response to "woi <something>"
+    if (msg.startsWith("woi ") && !msg.includes("ikut") && !msg.includes("gi bunuh")) {
+      const question = msg.slice(4).trim();
+      const response = handleAIChat(question);
+      if (response) {
+        bot.chat(response);
+      }
+    }
   });
 
+  // == DETECTION / INTERVALS ==
   setInterval(() => {
     if (!botSpawned) return;
 
@@ -197,7 +194,7 @@ function createBot() {
 
     if (nearbyMob) {
       attackEntity(nearbyMob);
-    } else if (following && followTarget) {
+    } else if (followTarget) {
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
   }, 3000);
@@ -210,10 +207,11 @@ function createBot() {
   }, 2000);
 
   setInterval(() => {
-    if (!botSpawned || !bot.entity) return;
-    const yaw = Math.random() * Math.PI * 2;
-    const pitch = (Math.random() - 0.5) * Math.PI / 4;
-    bot.look(yaw, pitch, true).catch(() => {});
+    if (botSpawned && bot.entity) {
+      const yaw = Math.random() * Math.PI * 2;
+      const pitch = (Math.random() - 0.5) * Math.PI / 4;
+      bot.look(yaw, pitch, true).catch(() => {});
+    }
   }, 8000);
 
   const messages = [
@@ -256,6 +254,20 @@ function createBot() {
   });
 }
 
+// == AI-STYLE CHAT (OPTIONAL) ==
+function handleAIChat(input) {
+  const lower = input.toLowerCase();
+
+  if (lower.includes("buat ape")) return "dok rilek je";
+  if (lower.includes("server ni hidup ke")) return "kalau aq on, hidup la tu";
+  if (lower.includes("ko sape")) return "ronaldinho bot, abang afk kat real world";
+  if (lower.includes("iqbal")) return "mne iqbal ntah, ghost mode";
+  if (lower.includes("iman")) return "iman love of my life";
+  if (lower.includes("ko tau tak")) return "aku tau je semua... tapi malas jawab";
+
+  return null;
+}
+
 createBot();
 
 // == KEEP ALIVE ==
@@ -263,5 +275,5 @@ const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (_, res) => res.send('Mineflayer bot is running!'));
 app.listen(port, () => {
-  console.log(`🌐 Fake server listening on port ${port}`);
+  console.log(`🌐 Server running on port ${port}`);
 });
