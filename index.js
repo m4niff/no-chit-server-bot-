@@ -8,14 +8,15 @@ const express = require('express');
 // == STATE ==
 let bot;
 let mcData;
-let following = false;
-let followTarget = null;
-let defaultMove;
 let botSpawned = false;
-let lastAttacker = null;
+let followTarget = null;
+let following = false;
+let defaultMove;
 let roaming = false;
 let currentTarget = null;
 let attackInterval = null;
+let lastAttacker = null;
+let fatalError = false;
 
 // == HOSTILE MOBS ==
 const hostileMobs = [
@@ -28,19 +29,16 @@ const hostileMobs = [
 function getNearestEntity(filter) {
   return Object.values(bot.entities)
     .filter(filter)
-    .sort((a, b) =>
-      bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position)
-    )[0];
+    .sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position))[0];
 }
 
 function equipWeapon() {
-  const sword = bot.inventory?.items()?.find(item => item.name.includes('sword'));
+  const sword = bot.inventory.items().find(item => item.name.includes('sword'));
   if (sword) bot.equip(sword, 'hand').catch(() => {});
 }
 
 function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
-
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
   clearInterval(attackInterval);
@@ -52,7 +50,6 @@ function attackEntity(entity) {
   attackInterval = setInterval(() => {
     if (!entity?.isValid || bot.health <= 0) {
       clearInterval(attackInterval);
-      attackInterval = null;
       currentTarget = null;
       return;
     }
@@ -70,6 +67,8 @@ function attackEntity(entity) {
 
 // == CREATE BOT ==
 function createBot() {
+  if (fatalError) return;
+
   console.log('🔄 Creating bot...');
   bot = mineflayer.createBot({
     host: 'neymar.aternos.me',
@@ -87,26 +86,25 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8); // water
+    defaultMove.blocksToAvoid.add(8); // Avoid water
     defaultMove.blocksToAvoid.add(9);
     bot.pathfinder.setMovements(defaultMove);
   });
 
   bot.on('login', () => console.log("🔓 Logged in to Minecraft server."));
 
-  // == HANDLING BANNED / KICKED / DUPLICATE LOGIN ==
+  // == DISCONNECT / KICK HANDLING ==
   function checkDisconnect(reason) {
-    const msg = reason?.toString().toLowerCase() || '';
+    const msg = (reason || '').toLowerCase();
     console.log(`❌ Disconnect reason: ${msg}`);
-    if (
-      msg.includes("banned") ||
-      msg.includes("kicked by an operator") ||
-      msg.includes("you logged in from another location") ||
-      msg.includes("duplicate login") ||
-      msg.includes("connection reset") ||
-      msg.includes("read error")
-    ) {
-      console.log("❌ Fatal disconnect. Shutting down.");
+
+    const isFatal = msg.includes("kicked") || msg.includes("banned") ||
+      msg.includes("another location") || msg.includes("duplicate") ||
+      msg.includes("connection reset") || msg.includes("read error");
+
+    if (isFatal) {
+      fatalError = true;
+      console.log("❌ Fatal disconnect. Not reconnecting.");
       process.exit(1);
     }
   }
@@ -116,9 +114,10 @@ function createBot() {
     console.log("❗ Bot error:", err.message);
     checkDisconnect(err.message);
   });
+
   bot.on('end', () => {
     console.log("🔌 Bot disconnected.");
-    process.exit(1);
+    if (!fatalError) setTimeout(createBot, 5000);
   });
 
   // == DEATH ==
@@ -137,13 +136,12 @@ function createBot() {
   // == CHAT COMMANDS ==
   bot.on('chat', (username, message) => {
     if (!botSpawned) return;
-    const player = bot.players[username];
-    if (!player || !player.entity) return;
-
+    const player = bot.players[username]?.entity;
+    if (!player) return;
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq') {
-      followTarget = player.entity;
+      followTarget = player;
       following = true;
       bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
@@ -176,18 +174,18 @@ function createBot() {
     }
   });
 
-  // == DEFENSE + FOLLOW COMBINED ==
+  // == DEFENSE / FOLLOW LOOP ==
   setInterval(() => {
     if (!botSpawned) return;
 
-    const closeMob = getNearestEntity(e =>
+    const nearbyMob = getNearestEntity(e =>
       e.type === 'mob' &&
       hostileMobs.includes(e.name) &&
       e.position.distanceTo(bot.entity.position) < 12
     );
 
-    if (closeMob) {
-      attackEntity(closeMob);
+    if (nearbyMob) {
+      attackEntity(nearbyMob);
     } else if (following && followTarget) {
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
@@ -201,7 +199,7 @@ function createBot() {
     }
   }, 2000);
 
-  // == RANDOM LOOK AROUND ==
+  // == RANDOM LOOK ==
   setInterval(() => {
     if (!botSpawned || !bot.entity) return;
     const yaw = Math.random() * Math.PI * 2;
@@ -209,29 +207,27 @@ function createBot() {
     bot.look(yaw, pitch, true).catch(() => {});
   }, 8000);
 
-  // == CHAT SPAM ==
+  // == RANDOM CHAT ==
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
-    "amirul hadif x nurul iman very very sweet good",
-    "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
+    "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
     "duatiga duatiga dua empat", "boikot perempuan nme sofea pantek jubo lahanat",
     "if u wana kno spe sofea hmm i dono", "bising do bal", "ko un sme je man",
     "apa ko bob", "okok ma bad ma fault gng🥀", "sat berak sat", "sunyi siak",
     "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
   ];
-  let index = 0;
+  let chatIndex = 0;
   setInterval(() => {
     if (botSpawned) {
       try {
-        bot.chat(messages[index]);
-        index = (index + 1) % messages.length;
+        bot.chat(messages[chatIndex]);
+        chatIndex = (chatIndex + 1) % messages.length;
       } catch (_) {}
     }
   }, 90000);
 
-  // == ATTACK ON HIT ==
+  // == HIT REACTION ==
   bot.on('entityHurt', (entity) => {
-    if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
       const attacker = getNearestEntity(e =>
         e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 4
