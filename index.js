@@ -14,7 +14,6 @@ let defaultMove;
 let botSpawned = false;
 let lastAttacker = null;
 let roaming = false;
-let roamInterval = null;
 let currentTarget = null;
 let attackInterval = null;
 
@@ -74,7 +73,6 @@ function attackEntity(entity) {
   }, 800);
 }
 
-
 // == BOT CREATION ==
 function createBot() {
   console.log('🔄 Creating bot...');
@@ -110,7 +108,7 @@ function createBot() {
       message.includes("you logged in from another location") ||
       message.includes("duplicate login")
     ) {
-      shutdownBotImmediately();
+      process.exit();
     }
   });
 
@@ -124,23 +122,20 @@ function createBot() {
       msg.includes("connection reset") ||
       msg.includes("read error")
     ) {
-      shutdownBotImmediately();
+      process.exit();
     }
   });
 
   bot.on('end', () => {
     console.log("🔌 Bot disconnected.");
-    shutdownBotImmediately();
+    process.exit();
   });
 
   bot.on('death', () => {
     console.log("☠️ Bot died. Respawning in 5 seconds...");
-    stopBotActions();
     setTimeout(() => {
-      if (bot.health <= 0) {
-        bot.emit('respawn');
-        console.log("🔄 Bot respawned.");
-      }
+      bot.emit('respawn');
+      console.log("🔄 Bot respawned.");
     }, 5000);
   });
 
@@ -152,24 +147,17 @@ function createBot() {
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq') {
-      stopBotActions();
       followTarget = player.entity;
       following = true;
       bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
 
-    if (msg === 'stop ikut') {
-      stopBotActions();
-      bot.chat("yeahyeah im a goodboy");
-    }
-
     if (msg === 'woi gi bunuh') {
       if (!roaming) {
-        stopBotActions();
         roaming = true;
         bot.chat("sigma alpha wolf activateddd");
-        roamInterval = setInterval(() => {
+        setInterval(() => {
           if (!botSpawned || bot.health <= 0) return;
 
           const mob = getNearestEntity(e =>
@@ -189,23 +177,31 @@ function createBot() {
         }, 4000);
       }
     }
-
-    if (msg === 'stop bunuh') {
-      stopBotActions();
-      bot.chat("okeoek");
-    }
   });
 
-  // == FOLLOW BEHAVIOR ==
+  // == FOLLOW & DEFENSE ==
   setInterval(() => {
-    if (following && followTarget && botSpawned) {
-      const nearbyMob = getNearestEntity(e =>
+    if (!botSpawned) return;
+
+    // Passive attack nearby mobs always
+    const passiveTarget = getNearestEntity(e =>
+      e.type === 'mob' &&
+      hostileMobs.includes(e.name) &&
+      e.position.distanceTo(bot.entity.position) < 12
+    );
+    if (passiveTarget) {
+      attackEntity(passiveTarget);
+    }
+
+    // Follow target if set
+    if (following && followTarget) {
+      const closeMob = getNearestEntity(e =>
         e.type === 'mob' &&
         hostileMobs.includes(e.name) &&
         e.position.distanceTo(bot.entity.position) < 8
       );
-      if (nearbyMob) {
-        attackEntity(nearbyMob);
+      if (closeMob) {
+        attackEntity(closeMob);
       } else {
         bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
       }
@@ -269,20 +265,6 @@ function createBot() {
       attackEntity(lastAttacker);
     }
   });
-
-  // == PASSIVE SCAN ==
-  setInterval(() => {
-    if (!botSpawned || roaming || bot.health <= 0) return;
-    const target = getNearestEntity(e =>
-      e.type === 'mob' &&
-      hostileMobs.includes(e.name) &&
-      e.position.distanceTo(bot.entity.position) < 12
-    );
-    if (target) {
-      lastAttacker = target;
-      attackEntity(target);
-    }
-  }, 3000);
 }
 
 createBot();
