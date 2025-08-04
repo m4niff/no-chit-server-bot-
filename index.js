@@ -20,7 +20,6 @@ const hostileMobs = [
   'vindication', 'ravager'
 ];
 
-// Helper: Get nearest entity matching a filter
 function getNearestEntity(filter) {
   let nearest = null;
   let nearestDistance = Infinity;
@@ -68,6 +67,12 @@ function stopBotActions() {
   } catch (_) {}
 }
 
+function shutdownBotImmediately() {
+  console.log("❌ Critical kick reason detected. Shutting down bot.");
+  stopBotActions();
+  process.exit(0);
+}
+
 function createBot() {
   console.log('🔄 Creating bot...');
   bot = mineflayer.createBot({
@@ -101,15 +106,16 @@ function createBot() {
       message.includes('You logged in from another location') ||
       message.includes('Kicked by an operator')
     ) {
-      console.log('Shutting down: Kicked for session conflict or by operator.');
-      process.exit();
+      shutdownBotImmediately();
     } else {
-      console.log('Reconnecting in 10 seconds...');
+      console.log('♻️ Reconnecting in 10 seconds...');
       setTimeout(createBot, 10000);
     }
   });
 
-  bot.on('error', err => console.log("❗ Bot error:", err.message));
+  bot.on('error', err => {
+    console.log("❗ Bot error:", err.message);
+  });
 
   bot.on('end', () => {
     console.log("🔌 Bot disconnected.");
@@ -256,11 +262,9 @@ createBot();
 
 const app = express();
 const port = process.env.PORT || 3000;
-
 app.get('/', (req, res) => {
   res.send('Mineflayer bot is running!');
 });
-
 app.listen(port, () => {
   console.log(`🌐 Fake server listening on port ${port}`);
 });
