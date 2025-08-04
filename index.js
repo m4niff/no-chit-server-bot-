@@ -182,7 +182,7 @@ function createBot() {
       bot.chat("yeahyeah im a goodboy");
     }
 
-    if (msg === 'wei gi bunuh monster') {
+    if (msg === 'woi gi bunuh') {
       if (!roaming) {
         stopBotActions();
         roaming = true;
@@ -208,9 +208,9 @@ function createBot() {
       }
     }
 
-    if (msg === 'stop cari monster') {
+    if (msg === 'stop bunuh') {
       stopBotActions();
-      bot.chat("no problem, u can ask me for help anytime..");
+      bot.chat("okeoek");
     }
   });
 
