@@ -74,28 +74,6 @@ function attackEntity(entity) {
   }, 800);
 }
 
-function stopBotActions() {
-  try {
-    bot.pathfinder.setGoal(null);
-    bot.clearControlStates();
-    clearInterval(roamInterval);
-    clearInterval(attackInterval);
-    attackInterval = null;
-    roamInterval = null;
-    currentTarget = null;
-    roaming = false;
-    following = false;
-    followTarget = null;
-    lastAttacker = null;
-    console.log("🛌 Bot actions stopped.");
-  } catch (_) {}
-}
-
-function shutdownBotImmediately() {
-  console.log("❌ Shutting down bot permanently.");
-  stopBotActions();
-  process.exit(0);
-}
 
 // == BOT CREATION ==
 function createBot() {
