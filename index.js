@@ -45,7 +45,6 @@ function equipWeapon() {
   if (sword) bot.equip(sword, 'hand').catch(() => {});
 }
 
-// ✅ Clean & safe attack logic
 function attackEntity(entity) {
   if (!entity || !entity.isValid || bot.health <= 0) return;
   if (currentTarget?.uuid === entity.uuid) return;
@@ -116,8 +115,8 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8);
-    defaultMove.blocksToAvoid.add(9);
+    defaultMove.blocksToAvoid.add(8); // water
+    defaultMove.blocksToAvoid.add(9); // water
     bot.pathfinder.setMovements(defaultMove);
   });
 
@@ -157,7 +156,7 @@ function createBot() {
   bot.on('death', () => {
     console.log("☠️ Bot died. Respawning in 5 seconds...");
     setTimeout(() => {
-      bot.emit('respawn');
+      if (bot) bot.emit('respawn');
       console.log("🔄 Bot respawned.");
     }, 5000);
   });
