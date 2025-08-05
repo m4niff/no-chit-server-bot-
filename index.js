@@ -144,43 +144,48 @@ function createBot() {
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq' && player) {
-      followTarget = player;
-      bot.chat("sat");
-      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
-    }
+    if (msg === 'woi ikut aq' && player) {
+    followTarget = player;
+    bot.chat("sat");
+    bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
+  }
 
-    if (msg === 'woi gi bunuh') {
-      if (!roamInterval) {
-        bot.chat("sigma alpha wolf activateddd");
-        roamInterval = setInterval(() => {
-          if (!botSpawned || bot.health <= 0) return;
-          const mob = getNearestEntity(e =>
-            e.type === 'mob' &&
-            hostileMobs.includes(e.name) &&
-            e.position.distanceTo(bot.entity.position) < 16
-          );
+  if (msg === 'woi stop ikut') {
+    followTarget = null;
+    bot.pathfinder.setGoal(null);
+    bot.chat("ok aq stop ikut");
+  }
 
-          if (mob) {
-            attackEntity(mob);
-          } else if (!currentTarget) {
-            const dx = Math.floor(Math.random() * 10 - 5);
-            const dz = Math.floor(Math.random() * 10 - 5);
-            const pos = bot.entity.position.offset(dx, 0, dz);
-            bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
-          }
-        }, 4000);
-      }
-    }
+  if (msg === 'woi gi bunuh') {
+    if (!roamInterval) {
+      bot.chat("sigma alpha wolf activateddd");
+      roamInterval = setInterval(() => {
+        if (!botSpawned || bot.health <= 0) return;
+        const mob = getNearestEntity(e =>
+          e.type === 'mob' &&
+          hostileMobs.includes(e.name) &&
+          e.position.distanceTo(bot.entity.position) < 16
+        );
 
-    // ✅ Optional: AI-style response to "woi <something>"
-    if (msg.startsWith("woi ") && !msg.includes("ikut") && !msg.includes("gi bunuh")) {
-      const question = msg.slice(4).trim();
-      const response = handleAIChat(question);
-      if (response) {
-        bot.chat(response);
-      }
+        if (mob) {
+          attackEntity(mob);
+        } else if (!currentTarget) {
+          const dx = Math.floor(Math.random() * 10 - 5);
+          const dz = Math.floor(Math.random() * 10 - 5);
+          const pos = bot.entity.position.offset(dx, 0, dz);
+          bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
+        }
+      }, 4000);
     }
-  });
+  }
+
+  if (msg === 'woi stop bunuh') {
+    clearInterval(roamInterval);
+    roamInterval = null;
+    currentTarget = null;
+    bot.pathfinder.setGoal(null);
+    bot.chat("ok aq stop bunuh");
+  }
 
   // == DETECTION / INTERVALS ==
   setInterval(() => {
@@ -252,20 +257,6 @@ function createBot() {
       attackEntity(lastAttacker);
     }
   });
-}
-
-// == AI-STYLE CHAT (OPTIONAL) ==
-function handleAIChat(input) {
-  const lower = input.toLowerCase();
-
-  if (lower.includes("buat ape")) return "dok rilek je";
-  if (lower.includes("server ni hidup ke")) return "kalau aq on, hidup la tu";
-  if (lower.includes("ko sape")) return "ronaldinho bot, abang afk kat real world";
-  if (lower.includes("iqbal")) return "mne iqbal ntah, ghost mode";
-  if (lower.includes("iman")) return "iman love of my life";
-  if (lower.includes("ko tau tak")) return "aku tau je semua... tapi malas jawab";
-
-  return null;
 }
 
 createBot();
