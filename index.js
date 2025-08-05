@@ -13,10 +13,9 @@ let followTarget = null;
 let defaultMove;
 let currentTarget = null;
 let attackInterval = null;
-let lastAttacker = null;
 let fatalError = false;
 let messageInterval = null;
-let roamInterval = null;
+let lastHitPlayer = null;
 
 // == HOSTILE MOBS ==
 const hostileMobs = [
@@ -84,12 +83,13 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8); // water
-    defaultMove.blocksToAvoid.add(9); // flowing water
+    defaultMove.blocksToAvoid.add(8);
+    defaultMove.blocksToAvoid.add(9);
 
     bot.pathfinder.setMovements(defaultMove);
   });
 
+  // == Reconnect / Exit ==
   function checkDisconnect(reason) {
     const msg = String(reason).toLowerCase();
     const isFatal = ["kicked", "banned", "another location", "duplicate", "connection reset", "read error"]
@@ -106,7 +106,6 @@ function createBot() {
   bot.on('error', err => checkDisconnect(err.message));
   bot.on('end', () => {
     clearInterval(attackInterval);
-    clearInterval(roamInterval);
     clearInterval(messageInterval);
     currentTarget = null;
     botSpawned = false;
@@ -121,9 +120,8 @@ function createBot() {
     }, 5000);
   });
 
-  // == CHAT COMMANDS ==
+  // == CHAT FOLLOW COMMAND ==
   bot.on('chat', (username, message) => {
-    if (!botSpawned) return;
     const player = bot.players[username]?.entity;
     const msg = message.toLowerCase();
 
@@ -138,53 +136,20 @@ function createBot() {
       bot.pathfinder.setGoal(null);
       bot.chat("ok aq stop ikut");
     }
-
-    if (msg === 'woi gi bunuh') {
-      if (!roamInterval) {
-        bot.chat("sigma alpha wolf activateddd");
-        roamInterval = setInterval(() => {
-          if (!botSpawned || bot.health <= 0) return;
-          const mob = getNearestEntity(e =>
-            e.type === 'mob' &&
-            hostileMobs.includes(e.name) &&
-            e.position.distanceTo(bot.entity.position) < 16
-          );
-
-          if (mob) {
-            attackEntity(mob);
-          } else if (!currentTarget) {
-            const dx = Math.floor(Math.random() * 10 - 5);
-            const dz = Math.floor(Math.random() * 10 - 5);
-            const pos = bot.entity.position.offset(dx, 0, dz);
-            bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
-          }
-        }, 3000);
-      }
-    }
-
-    if (msg === 'woi stop bunuh') {
-      clearInterval(roamInterval);
-      roamInterval = null;
-      currentTarget = null;
-      bot.pathfinder.setGoal(null);
-      bot.chat("ok aq stop bunuh");
-    }
   });
 
-  // == MOBS DETECTION LOOP ==
+  // == HUNT LOOP ==
   setInterval(() => {
-    if (!botSpawned) return;
-    const nearbyMob = getNearestEntity(e =>
+    if (!botSpawned || bot.health <= 0) return;
+
+    const mob = getNearestEntity(e =>
       e.type === 'mob' &&
       hostileMobs.includes(e.name) &&
-      e.position.distanceTo(bot.entity.position) < 10
+      e.position.distanceTo(bot.entity.position) < 16
     );
 
-    if (nearbyMob) attackEntity(nearbyMob);
-    else if (followTarget?.isValid) {
-      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
-    }
-  }, 3000);
+    if (mob) attackEntity(mob);
+  }, 2500);
 
   // == WATER ESCAPE ==
   setInterval(() => {
@@ -225,24 +190,27 @@ function createBot() {
     }
   }, 90000);
 
-  // == MOB DEFENSE ==
+  // == DEFENSE: MOB or PLAYER ATTACKS BOT ==
   bot.on('entityHurt', (entity) => {
+    if (!botSpawned || !entity || !entity.uuid) return;
+
+    // MOB hit the bot
     if (entity.uuid === bot.uuid) {
-      const attacker = getNearestEntity(e =>
-        e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 4
-      );
+      const attacker = getNearestEntity(e => e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 4);
       if (attacker) {
-        lastAttacker = attacker;
-        bot.chat(`yo tf? ${attacker.name}`);
         attackEntity(attacker);
       }
-    }
-  });
 
-  bot.on('health', () => {
-    if (bot.health < 5 && lastAttacker?.isValid) {
-      bot.chat('ur goin too far dawg');
-      attackEntity(lastAttacker);
+      // PLAYER hit the bot
+      const player = getNearestEntity(e => e.type === 'player' && e.username !== bot.username && e.position.distanceTo(bot.entity.position) < 3);
+      if (player && (!lastHitPlayer || lastHitPlayer.uuid !== player.uuid)) {
+        lastHitPlayer = player;
+        bot.chat("ambik ko");
+        bot.lookAt(player.position.offset(0, player.height, 0)).then(() => {
+          bot.attack(player);
+        }).catch(() => {});
+        setTimeout(() => { lastHitPlayer = null }, 10000); // prevent repeated hit
+      }
     }
   });
 }
