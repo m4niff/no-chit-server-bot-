@@ -144,48 +144,48 @@ function createBot() {
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq' && player) {
-    if (msg === 'woi ikut aq' && player) {
-    followTarget = player;
-    bot.chat("sat");
-    bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
-  }
-
-  if (msg === 'woi stop ikut') {
-    followTarget = null;
-    bot.pathfinder.setGoal(null);
-    bot.chat("ok aq stop ikut");
-  }
-
-  if (msg === 'woi gi bunuh') {
-    if (!roamInterval) {
-      bot.chat("sigma alpha wolf activateddd");
-      roamInterval = setInterval(() => {
-        if (!botSpawned || bot.health <= 0) return;
-        const mob = getNearestEntity(e =>
-          e.type === 'mob' &&
-          hostileMobs.includes(e.name) &&
-          e.position.distanceTo(bot.entity.position) < 16
-        );
-
-        if (mob) {
-          attackEntity(mob);
-        } else if (!currentTarget) {
-          const dx = Math.floor(Math.random() * 10 - 5);
-          const dz = Math.floor(Math.random() * 10 - 5);
-          const pos = bot.entity.position.offset(dx, 0, dz);
-          bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
-        }
-      }, 4000);
+      followTarget = player;
+      bot.chat("sat");
+      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
-  }
 
-  if (msg === 'woi stop bunuh') {
-    clearInterval(roamInterval);
-    roamInterval = null;
-    currentTarget = null;
-    bot.pathfinder.setGoal(null);
-    bot.chat("ok aq stop bunuh");
-  }
+    if (msg === 'woi stop ikut') {
+      followTarget = null;
+      bot.pathfinder.setGoal(null);
+      bot.chat("ok aq stop ikut");
+    }
+
+    if (msg === 'woi gi bunuh') {
+      if (!roamInterval) {
+        bot.chat("sigma alpha wolf activateddd");
+        roamInterval = setInterval(() => {
+          if (!botSpawned || bot.health <= 0) return;
+          const mob = getNearestEntity(e =>
+            e.type === 'mob' &&
+            hostileMobs.includes(e.name) &&
+            e.position.distanceTo(bot.entity.position) < 16
+          );
+
+          if (mob) {
+            attackEntity(mob);
+          } else if (!currentTarget) {
+            const dx = Math.floor(Math.random() * 10 - 5);
+            const dz = Math.floor(Math.random() * 10 - 5);
+            const pos = bot.entity.position.offset(dx, 0, dz);
+            bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
+          }
+        }, 4000);
+      }
+    }
+
+    if (msg === 'woi stop bunuh') {
+      clearInterval(roamInterval);
+      roamInterval = null;
+      currentTarget = null;
+      bot.pathfinder.setGoal(null);
+      bot.chat("ok aq stop bunuh");
+    }
+  });
 
   // == DETECTION / INTERVALS ==
   setInterval(() => {
