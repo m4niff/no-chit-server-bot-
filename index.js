@@ -8,17 +8,14 @@ const express = require('express');
 // == STATE ==
 let bot;
 let mcData;
-let botSpawned = false;
 let followTarget = null;
-let defaultMove;
 let currentTarget = null;
 let attackInterval = null;
-let lastAttacker = null;
-let fatalError = false;
-let messageInterval = null;
 let roamInterval = null;
+let messageInterval = null;
+let fatalError = false;
 
-// == HOSTILE MOBS ==
+// == MOBS ==
 const hostileMobs = [
   'zombie', 'drowned', 'skeleton', 'creeper', 'spider', 'husk',
   'witch', 'zombified_piglin', 'zoglin', 'phantom', 'vex',
@@ -29,11 +26,15 @@ const hostileMobs = [
 function getNearestEntity(filter) {
   return Object.values(bot.entities)
     .filter(filter)
-    .sort((a, b) => bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position))[0];
+    .sort((a, b) =>
+      bot.entity.position.distanceTo(a.position) - bot.entity.position.distanceTo(b.position)
+    )[0];
 }
 
 function equipWeapon() {
-  const weapon = bot.inventory.items().find(i => i.name.includes('sword') || i.name.includes('axe'));
+  const weapon = bot.inventory.items().find(i =>
+    i.name.includes('sword') || i.name.includes('axe')
+  );
   if (weapon) bot.equip(weapon, 'hand').catch(() => {});
 }
 
@@ -68,7 +69,6 @@ function attackEntity(entity) {
 function createBot() {
   if (fatalError) return;
 
-  console.log("🔄 Creating bot...");
   bot = mineflayer.createBot({
     host: 'neymar.aternos.me',
     port: 48991,
@@ -79,71 +79,22 @@ function createBot() {
   bot.loadPlugin(pathfinder);
 
   bot.once('spawn', () => {
-    console.log("✅ Bot spawned and ready.");
-    botSpawned = true;
     mcData = mcDataLoader(bot.version);
-
-    defaultMove = new Movements(bot, mcData);
+    const defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8);
-    defaultMove.blocksToAvoid.add(9);
+    defaultMove.blocksToAvoid.add(8); // water
+    defaultMove.blocksToAvoid.add(9); // flowing water
     bot.pathfinder.setMovements(defaultMove);
+    console.log("✅ Bot ready");
   });
 
-  bot.on('login', () => console.log("🔓 Logged in to server."));
-
-  function checkDisconnect(reason) {
-    const msg = typeof reason === 'string' ? reason.toLowerCase() : JSON.stringify(reason).toLowerCase();
-    console.log("❌ Disconnect reason:", msg);
-
-    const isFatal = msg.includes("kicked") || msg.includes("banned") ||
-      msg.includes("another location") || msg.includes("duplicate") ||
-      msg.includes("connection reset") || msg.includes("read error");
-
-    if (isFatal) {
-      fatalError = true;
-      console.log("🛑 Fatal disconnect. Not reconnecting.");
-      process.exit(1);
-    }
-  }
-
-  bot.on('kicked', checkDisconnect);
-  bot.on('error', err => {
-    console.log("⚠️ Bot error:", err.message);
-    checkDisconnect(err.message);
-  });
-
-  bot.on('end', () => {
-    console.log("🔌 Disconnected.");
-    clearInterval(attackInterval);
-    clearInterval(roamInterval);
-    clearInterval(messageInterval);
-    currentTarget = null;
-    botSpawned = false;
-
-    if (!fatalError) {
-      setTimeout(createBot, 5000);
-    }
-  });
-
-  bot.on('death', () => {
-    console.log("☠️ Bot died. Respawning soon...");
-    clearInterval(attackInterval);
-    currentTarget = null;
-
-    setTimeout(() => {
-      if (botSpawned) bot.emit('respawn');
-    }, 5000);
-  });
-
-  // == CHAT EVENTS ==
   bot.on('chat', (username, message) => {
-    if (!botSpawned) return;
-    const player = bot.players[username]?.entity;
     const msg = message.toLowerCase();
+    const player = bot.players[username]?.entity;
+    if (!player) return;
 
-    if (msg === 'woi ikut aq' && player) {
+    if (msg === 'woi ikut aq') {
       followTarget = player;
       bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
@@ -159,22 +110,19 @@ function createBot() {
       if (!roamInterval) {
         bot.chat("sigma alpha wolf activateddd");
         roamInterval = setInterval(() => {
-          if (!botSpawned || bot.health <= 0) return;
           const mob = getNearestEntity(e =>
             e.type === 'mob' &&
             hostileMobs.includes(e.name) &&
             e.position.distanceTo(bot.entity.position) < 16
           );
-
-          if (mob) {
-            attackEntity(mob);
-          } else if (!currentTarget) {
+          if (mob) attackEntity(mob);
+          else if (!currentTarget) {
             const dx = Math.floor(Math.random() * 10 - 5);
             const dz = Math.floor(Math.random() * 10 - 5);
             const pos = bot.entity.position.offset(dx, 0, dz);
             bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
           }
-        }, 4000);
+        }, 3000);
       }
     }
 
@@ -187,37 +135,53 @@ function createBot() {
     }
   });
 
-  // == DETECTION / INTERVALS ==
-  setInterval(() => {
-    if (!botSpawned) return;
-
-    const nearbyMob = getNearestEntity(e =>
-      e.type === 'mob' &&
-      hostileMobs.includes(e.name) &&
-      e.position.distanceTo(bot.entity.position) < 12
-    );
-
-    if (nearbyMob) {
-      attackEntity(nearbyMob);
-    } else if (followTarget) {
-      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
+  bot.on('health', () => {
+    if (bot.health < 5 && currentTarget?.isValid) {
+      bot.chat('ur goin too far dawg');
+      attackEntity(currentTarget);
     }
-  }, 3000);
+  });
 
-  setInterval(() => {
-    if (botSpawned && bot.entity?.isInWater) {
-      bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 500);
+  bot.on('entityHurt', (entity) => {
+    if (entity.uuid === bot.uuid) {
+      const attacker = getNearestEntity(e =>
+        e.type === 'mob' &&
+        e.position.distanceTo(bot.entity.position) < 4
+      );
+      if (attacker) {
+        bot.chat(`yo tf? ${attacker.name}`);
+        attackEntity(attacker);
+      }
     }
-  }, 2000);
+  });
 
-  setInterval(() => {
-    if (botSpawned && bot.entity) {
-      const yaw = Math.random() * Math.PI * 2;
-      const pitch = (Math.random() - 0.5) * Math.PI / 4;
-      bot.look(yaw, pitch, true).catch(() => {});
+  bot.on('end', () => {
+    clearInterval(attackInterval);
+    clearInterval(roamInterval);
+    clearInterval(messageInterval);
+    if (!fatalError) {
+      console.log("🔁 Bot restarting...");
+      setTimeout(createBot, 5000);
     }
-  }, 8000);
+  });
+
+  bot.on('kicked', reason => handleDisconnect(reason));
+  bot.on('error', err => handleDisconnect(err.message));
+  bot.on('death', () => {
+    clearInterval(attackInterval);
+    currentTarget = null;
+    setTimeout(() => bot.emit('respawn'), 3000);
+  });
+
+  function handleDisconnect(reason) {
+    const msg = typeof reason === 'string' ? reason.toLowerCase() : '';
+    console.log("❌ Disconnected:", msg);
+    if (msg.includes("kicked") || msg.includes("banned") || msg.includes("connection reset")) {
+      fatalError = true;
+      console.log("🛑 Fatal disconnect. Not reconnecting.");
+      process.exit(1);
+    }
+  }
 
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
@@ -230,41 +194,26 @@ function createBot() {
 
   let chatIndex = 0;
   messageInterval = setInterval(() => {
-    if (botSpawned && bot.health > 0) {
-      try {
-        bot.chat(messages[chatIndex]);
-        chatIndex = (chatIndex + 1) % messages.length;
-      } catch (_) {}
+    if (bot && bot.health > 0) {
+      bot.chat(messages[chatIndex]);
+      chatIndex = (chatIndex + 1) % messages.length;
     }
   }, 90000);
 
-  bot.on('entityHurt', (entity) => {
-    if (entity.uuid === bot.uuid) {
-      const attacker = getNearestEntity(e =>
-        e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 4
-      );
-      if (attacker) {
-        lastAttacker = attacker;
-        bot.chat(`yo tf? ${attacker.name}`);
-        attackEntity(attacker);
-      }
+  // Anti drowning
+  setInterval(() => {
+    if (bot?.entity?.isInWater) {
+      bot.setControlState('jump', true);
+      setTimeout(() => bot.setControlState('jump', false), 300);
     }
-  });
-
-  bot.on('health', () => {
-    if (bot.health < 5 && lastAttacker?.isValid) {
-      bot.chat('ur goin too far dawg');
-      attackEntity(lastAttacker);
-    }
-  });
+  }, 1000);
 }
 
 createBot();
 
 // == KEEP ALIVE ==
 const app = express();
-const port = process.env.PORT || 3000;
 app.get('/', (_, res) => res.send('Mineflayer bot is running!'));
-app.listen(port, () => {
-  console.log(`🌐 Server running on port ${port}`);
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🌐 Web server online.");
 });
