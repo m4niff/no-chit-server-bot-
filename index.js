@@ -38,6 +38,7 @@ function equipWeapon() {
 
 function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
+  if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
   clearInterval(attackInterval);
   currentTarget = entity;
@@ -59,7 +60,7 @@ function attackEntity(entity) {
         bot.attack(entity);
       }).catch(() => {});
     }
-  }, 400); // faster attacks
+  }, 400);
 }
 
 // == CREATE BOT ==
@@ -88,12 +89,10 @@ function createBot() {
     bot.pathfinder.setMovements(defaultMove);
   });
 
-  // == Reconnect / Exit ==
   function checkDisconnect(reason) {
     const msg = String(reason).toLowerCase();
     const isFatal = ["kicked", "banned", "another location", "duplicate", "connection reset", "read error"]
       .some(k => msg.includes(k));
-
     if (isFatal) {
       fatalError = true;
       process.exit(1);
@@ -115,46 +114,36 @@ function createBot() {
     clearInterval(attackInterval);
     attackInterval = null;
     currentTarget = null;
-
     setTimeout(() => {
       if (botSpawned) bot.emit('respawn');
-      setTimeout(() => {
-        const nearestMob = getNearestEntity(e =>
-          e.type === 'mob' &&
-          hostileMobs.includes(e.name)
-        );
-        if (nearestMob) attackEntity(nearestMob);
-      }, 3000);
     }, 3000);
   });
 
-  // == CHAT FOLLOW COMMAND ==
+  // == FOLLOW PLAYER ==
   bot.on('chat', (username, message) => {
     const player = bot.players[username]?.entity;
     const msg = message.toLowerCase();
 
     if (msg === 'woi ikut aq' && player) {
       followTarget = player;
-      bot.chat("sat");
+      try { bot.chat("sat"); } catch (_) {}
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
 
     if (msg === 'woi stop ikut') {
       followTarget = null;
       bot.pathfinder.setGoal(null);
-      bot.chat("ok aq stop ikut");
+      try { bot.chat("ok aq stop ikut"); } catch (_) {}
     }
   });
 
-  // == AUTO HUNT LOOP ==
+  // == HUNT LOOP ==
   setInterval(() => {
     if (!botSpawned || bot.health <= 0) return;
-
     const mob = getNearestEntity(e =>
       e.type === 'mob' &&
       hostileMobs.includes(e.name)
     );
-
     if (mob) attackEntity(mob);
   }, 2000);
 
@@ -170,7 +159,7 @@ function createBot() {
     }
   }, 2500);
 
-  // == RANDOM LOOK AROUND ==
+  // == RANDOM LOOK ==
   setInterval(() => {
     if (botSpawned && bot.entity) {
       const yaw = Math.random() * Math.PI * 2;
@@ -179,7 +168,7 @@ function createBot() {
     }
   }, 10000);
 
-  // == AUTO CHAT ==
+  // == RANDOM CHAT ==
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
@@ -192,12 +181,16 @@ function createBot() {
   let chatIndex = 0;
   messageInterval = setInterval(() => {
     if (botSpawned && bot.health > 0) {
-      bot.chat(messages[chatIndex]);
-      chatIndex = (chatIndex + 1) % messages.length;
+      try {
+        bot.chat(messages[chatIndex]);
+        chatIndex = (chatIndex + 1) % messages.length;
+      } catch (err) {
+        console.warn("Failed to chat:", err.message);
+      }
     }
   }, 90000);
 
-  // == DEFENSE: MOB or PLAYER ATTACKS BOT ==
+  // == DEFENSE SYSTEM ==
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity?.uuid) return;
 
@@ -213,7 +206,7 @@ function createBot() {
 
       if (player && (!lastHitPlayer || lastHitPlayer.uuid !== player.uuid)) {
         lastHitPlayer = player;
-        bot.chat("ambik ko");
+        try { bot.chat("ambik ko"); } catch (_) {}
         bot.lookAt(player.position.offset(0, player.height, 0)).then(() => {
           bot.attack(player);
         }).catch(() => {});
@@ -230,3 +223,11 @@ const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (_, res) => res.send('Mineflayer bot is running!'));
 app.listen(port, () => console.log(`🌐 Server running on port ${port}`));
+
+// == GLOBAL ERROR HANDLING ==
+process.on('uncaughtException', err => {
+  console.error('❌ Uncaught Exception:', err);
+});
+process.on('unhandledRejection', err => {
+  console.error('❌ Unhandled Rejection:', err);
+});
