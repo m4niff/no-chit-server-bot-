@@ -1,7 +1,7 @@
 // == IMPORTS ==
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const { GoalFollow } = goals;
+const { GoalFollow, GoalBlock } = goals;
 const mcDataLoader = require('minecraft-data');
 const express = require('express');
 
@@ -39,6 +39,10 @@ function equipWeapon() {
 function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
+
+  // Skip if entity is in water
+  const blockBelow = bot.blockAt(entity.position.offset(0, -1, 0));
+  if (blockBelow && blockBelow.name.includes('water')) return;
 
   clearInterval(attackInterval);
   currentTarget = entity;
@@ -83,8 +87,8 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8);
-    defaultMove.blocksToAvoid.add(9);
+    defaultMove.blocksToAvoid.add(8); // water
+    defaultMove.blocksToAvoid.add(9); // flowing water
 
     bot.pathfinder.setMovements(defaultMove);
   });
@@ -139,7 +143,7 @@ function createBot() {
 
   // == HUNT LOOP ==
   setInterval(() => {
-    if (!botSpawned || bot.health <= 0) return;
+    if (!botSpawned || bot.health <= 0 || bot.entity?.isInWater) return;
     const mob = getNearestEntity(e =>
       e.type === 'mob' &&
       hostileMobs.includes(e.name)
@@ -147,9 +151,21 @@ function createBot() {
     if (mob) attackEntity(mob);
   }, 2000);
 
-  // == WATER ESCAPE ==
+  // == SMART WATER ESCAPE ==
   setInterval(() => {
-    if (botSpawned && bot.entity?.isInWater) {
+    if (!botSpawned || !bot.entity?.isInWater) return;
+
+    const landBlock = bot.findBlock({
+      matching: block => block.boundingBox === 'block' && !block.name.includes('water'),
+      maxDistance: 10,
+      point: bot.entity.position
+    });
+
+    if (landBlock) {
+      bot.chat("tolong air");
+      bot.pathfinder.setGoal(new GoalBlock(landBlock.position.x, landBlock.position.y, landBlock.position.z));
+    } else {
+      // fallback jump + forward
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
       setTimeout(() => {
@@ -157,7 +173,7 @@ function createBot() {
         bot.setControlState('forward', false);
       }, 1000);
     }
-  }, 2500);
+  }, 2000);
 
   // == RANDOM LOOK ==
   setInterval(() => {
