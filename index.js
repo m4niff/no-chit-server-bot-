@@ -1,7 +1,7 @@
 // == IMPORTS ==
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const { GoalFollow, GoalNear, GoalBlock } = goals;
+const { GoalFollow } = goals;
 const mcDataLoader = require('minecraft-data');
 const express = require('express');
 
@@ -38,13 +38,12 @@ function equipWeapon() {
 
 function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
-  if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
   clearInterval(attackInterval);
   currentTarget = entity;
   equipWeapon();
 
-  bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1));
+  bot.pathfinder.setGoal(new GoalFollow(entity, 1), false);
 
   attackInterval = setInterval(() => {
     if (!entity?.isValid || bot.health <= 0) {
@@ -55,12 +54,12 @@ function attackEntity(entity) {
     }
 
     const dist = bot.entity.position.distanceTo(entity.position);
-    if (dist < 3 && bot.canSeeEntity(entity)) {
+    if (dist < 3.5 && bot.canSeeEntity(entity)) {
       bot.lookAt(entity.position.offset(0, entity.height, 0)).then(() => {
         bot.attack(entity);
       }).catch(() => {});
     }
-  }, 800);
+  }, 400); // faster attacks
 }
 
 // == CREATE BOT ==
@@ -101,7 +100,7 @@ function createBot() {
     }
   }
 
-  bot.on('login', () => console.log("Logged in."));
+  bot.on('login', () => console.log("✅ Logged in."));
   bot.on('kicked', checkDisconnect);
   bot.on('error', err => checkDisconnect(err.message));
   bot.on('end', () => {
@@ -114,10 +113,19 @@ function createBot() {
 
   bot.on('death', () => {
     clearInterval(attackInterval);
+    attackInterval = null;
     currentTarget = null;
+
     setTimeout(() => {
       if (botSpawned) bot.emit('respawn');
-    }, 5000);
+      setTimeout(() => {
+        const nearestMob = getNearestEntity(e =>
+          e.type === 'mob' &&
+          hostileMobs.includes(e.name)
+        );
+        if (nearestMob) attackEntity(nearestMob);
+      }, 3000);
+    }, 3000);
   });
 
   // == CHAT FOLLOW COMMAND ==
@@ -138,18 +146,17 @@ function createBot() {
     }
   });
 
-  // == HUNT LOOP ==
+  // == AUTO HUNT LOOP ==
   setInterval(() => {
     if (!botSpawned || bot.health <= 0) return;
 
     const mob = getNearestEntity(e =>
       e.type === 'mob' &&
-      hostileMobs.includes(e.name) &&
-      e.position.distanceTo(bot.entity.position) < 16
+      hostileMobs.includes(e.name)
     );
 
     if (mob) attackEntity(mob);
-  }, 2500);
+  }, 2000);
 
   // == WATER ESCAPE ==
   setInterval(() => {
@@ -192,24 +199,25 @@ function createBot() {
 
   // == DEFENSE: MOB or PLAYER ATTACKS BOT ==
   bot.on('entityHurt', (entity) => {
-    if (!botSpawned || !entity || !entity.uuid) return;
+    if (!botSpawned || !entity?.uuid) return;
 
-    // MOB hit the bot
     if (entity.uuid === bot.uuid) {
-      const attacker = getNearestEntity(e => e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 4);
-      if (attacker) {
-        attackEntity(attacker);
-      }
+      const attacker = getNearestEntity(e => e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 5);
+      if (attacker) attackEntity(attacker);
 
-      // PLAYER hit the bot
-      const player = getNearestEntity(e => e.type === 'player' && e.username !== bot.username && e.position.distanceTo(bot.entity.position) < 3);
+      const player = getNearestEntity(e =>
+        e.type === 'player' &&
+        e.username !== bot.username &&
+        e.position.distanceTo(bot.entity.position) < 3
+      );
+
       if (player && (!lastHitPlayer || lastHitPlayer.uuid !== player.uuid)) {
         lastHitPlayer = player;
         bot.chat("ambik ko");
         bot.lookAt(player.position.offset(0, player.height, 0)).then(() => {
           bot.attack(player);
         }).catch(() => {});
-        setTimeout(() => { lastHitPlayer = null }, 10000); // prevent repeated hit
+        setTimeout(() => { lastHitPlayer = null }, 10000);
       }
     }
   });
