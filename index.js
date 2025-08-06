@@ -91,16 +91,17 @@ function createBot() {
     defaultMove.canDig = false;
     defaultMove.canSwim = false;
 
-    const waterBlock = mcData.blocksByName?.water;
-    const flowingWaterBlock = mcData.blocksByName?.flowing_water;
-
-    if (waterBlock) defaultMove.blocksToAvoid.add(waterBlock.id);
-    if (flowingWaterBlock) defaultMove.blocksToAvoid.add(flowingWaterBlock.id);
+    const waterBlocks = ['water', 'flowing_water'];
+    waterBlocks.forEach(name => {
+      const block = mcData.blocksByName[name];
+      if (block) defaultMove.blocksToAvoid.add(block.id);
+    });
 
     bot.pathfinder.setMovements(defaultMove);
-    equipWeapon(); // Equip weapon after spawn
+    equipWeapon();
   });
 
+  // == EVENTS ==
   function checkDisconnect(reason) {
     const msg = String(reason).toLowerCase();
     const isFatal = ["kicked", "banned", "another location", "duplicate", "connection reset", "read error"]
@@ -122,24 +123,25 @@ function createBot() {
     if (!fatalError) setTimeout(createBot, 5000);
   });
 
+  bot.on('respawn', () => {
+    equipWeapon();
+  });
+
   bot.on('death', () => {
     clearInterval(attackInterval);
     attackInterval = null;
     currentTarget = null;
-    setTimeout(() => {
-      if (botSpawned) bot.emit('respawn');
-    }, 3000);
   });
 
-  // == FOLLOW PLAYER ==
+  // == CHAT COMMANDS ==
   bot.on('chat', (username, message) => {
-    const player = bot.players[username]?.entity;
     const msg = message.toLowerCase();
+    const player = bot.players[username]?.entity;
 
     if (msg === 'woi ikut aq' && player) {
       followTarget = player;
       bot.chat("sat");
-      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
+      bot.pathfinder.setGoal(new GoalFollow(player, 1), true);
     }
 
     if (msg === 'woi stop ikut') {
@@ -149,74 +151,44 @@ function createBot() {
     }
   });
 
-  // == HUNT LOOP ==
+  // == ATTACK NEAREST HOSTILE MOB ==
   setInterval(() => {
     if (!botSpawned || bot.health <= 0 || bot.entity?.isInWater) return;
+
     const mob = getNearestEntity(e =>
       e.type === 'mob' &&
-      hostileMobs.includes(e.name)
+      hostileMobs.includes(e.name) &&
+      e.position.distanceTo(bot.entity.position) < 15
     );
+
     if (mob) attackEntity(mob);
   }, 2000);
 
-  // == SMART WATER ESCAPE ==
+  // == ESCAPE WATER ==
   setInterval(() => {
     if (!botSpawned || !bot.entity?.isInWater) return;
 
-    const landBlock = bot.findBlock({
+    const land = bot.findBlock({
       matching: block => block.boundingBox === 'block' && !block.name.includes('water'),
-      maxDistance: 10,
-      point: bot.entity.position
+      maxDistance: 10
     });
 
-    if (landBlock) {
-      bot.pathfinder.setGoal(new GoalBlock(landBlock.position.x, landBlock.position.y, landBlock.position.z));
+    if (land) {
+      bot.pathfinder.setGoal(new GoalBlock(land.position.x, land.position.y, land.position.z));
     } else {
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
       setTimeout(() => {
         bot.setControlState('jump', false);
         bot.setControlState('forward', false);
-      }, 1000);
+      }, 1500);
     }
   }, 2000);
 
-  // == RANDOM LOOK ==
-  setInterval(() => {
-    if (botSpawned && bot.entity) {
-      const yaw = Math.random() * Math.PI * 2;
-      const pitch = (Math.random() - 0.5) * Math.PI / 4;
-      bot.look(yaw, pitch, true).catch(() => {});
-    }
-  }, 10000);
-
-  // == RANDOM CHAT ==
-  const messages = [
-    "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
-    "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
-    "duatiga duatiga dua empat", "boikot perempuan nme sofea pantek jubo lahanat",
-    "if u wana kno spe sofea hmm i dono", "bising do bal", "ko un sme je man",
-    "apa ko bob", "okok ma bad ma fault gng🥀", "sat berak sat", "sunyi siak",
-    "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
-  ];
-
-  let chatIndex = 0;
-  messageInterval = setInterval(() => {
-    if (botSpawned && bot.health > 0) {
-      try {
-        bot.chat(messages[chatIndex]);
-        chatIndex = (chatIndex + 1) % messages.length;
-      } catch (err) {
-        console.warn("Failed to chat:", err.message);
-      }
-    }
-  }, 90000);
-
-  // == DEFENSE SYSTEM ==
+  // == DEFEND SELF ==
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity?.uuid) return;
 
-    // If bot is hurt, look for nearby attackers
     if (entity.uuid === bot.uuid) {
       const attacker = getNearestEntity(e =>
         e.type === 'mob' &&
@@ -241,8 +213,40 @@ function createBot() {
       }
     }
   });
+
+  // == RANDOM CHAT ==
+  const messages = [
+    "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
+    "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
+    "duatiga duatiga dua empat", "boikot perempuan nme sofea pantek jubo lahanat",
+    "if u wana kno spe sofea hmm i dono", "bising do bal", "ko un sme je man",
+    "apa ko bob", "okok ma bad ma fault gng🥀", "sat berak sat", "sunyi siak",
+    "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal"
+  ];
+  let chatIndex = 0;
+
+  messageInterval = setInterval(() => {
+    if (botSpawned && bot.health > 0) {
+      try {
+        bot.chat(messages[chatIndex]);
+        chatIndex = (chatIndex + 1) % messages.length;
+      } catch (err) {
+        console.warn("Failed to chat:", err.message);
+      }
+    }
+  }, 90000);
+
+  // == RANDOM LOOK ==
+  setInterval(() => {
+    if (botSpawned && bot.entity) {
+      const yaw = Math.random() * Math.PI * 2;
+      const pitch = (Math.random() - 0.5) * Math.PI / 4;
+      bot.look(yaw, pitch, true).catch(() => {});
+    }
+  }, 10000);
 }
 
+// == INIT ==
 createBot();
 
 // == KEEP ALIVE ==
