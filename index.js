@@ -192,7 +192,7 @@ function createBot() {
 
   // == RANDOM CHAT ==
   const messages = [
-    "mne iman my love", "bising bdo karina", "mne iqbal",
+    "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
     "duatiga duatiga dua empat", "boikot perempuan nme sofea pantek jubo lahanat",
     "if u wana kno spe sofea hmm i dono", "bising do bal", "ko un sme je man",
