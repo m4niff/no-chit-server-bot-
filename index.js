@@ -40,7 +40,6 @@ function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
-  // Skip mobs in water
   const blockBelow = bot.blockAt(entity.position.offset(0, -1, 0));
   if (blockBelow && blockBelow.name.includes('water')) return;
 
@@ -88,8 +87,12 @@ function createBot() {
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
     defaultMove.canSwim = false;
-    defaultMove.blocksToAvoid.add(mcData.blocksByName.water.id);
-    defaultMove.blocksToAvoid.add(mcData.blocksByName.flowing_water.id);
+
+    const waterBlock = mcData.blocksByName?.water;
+    const flowingWaterBlock = mcData.blocksByName?.flowing_water;
+
+    if (waterBlock) defaultMove.blocksToAvoid.add(waterBlock.id);
+    if (flowingWaterBlock) defaultMove.blocksToAvoid.add(flowingWaterBlock.id);
 
     bot.pathfinder.setMovements(defaultMove);
   });
