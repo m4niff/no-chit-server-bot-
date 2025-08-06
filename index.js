@@ -32,16 +32,19 @@ function getNearestEntity(filter) {
 }
 
 function equipWeapon() {
-  const weapon = bot.inventory.items().find(i => i.name.includes('sword') || i.name.includes('axe'));
-  if (weapon) bot.equip(weapon, 'hand').catch(() => {});
+  const weapon = bot.inventory.items().find(item =>
+    item.name.includes('netherite_sword') ||
+    item.name.includes('sword') ||
+    item.name.includes('axe')
+  );
+  if (weapon) {
+    bot.equip(weapon, 'hand').catch(() => {});
+  }
 }
 
 function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
-
-  const blockBelow = bot.blockAt(entity.position.offset(0, -1, 0));
-  if (blockBelow && blockBelow.name.includes('water')) return;
 
   clearInterval(attackInterval);
   currentTarget = entity;
@@ -95,6 +98,7 @@ function createBot() {
     if (flowingWaterBlock) defaultMove.blocksToAvoid.add(flowingWaterBlock.id);
 
     bot.pathfinder.setMovements(defaultMove);
+    equipWeapon(); // Equip weapon after spawn
   });
 
   function checkDisconnect(reason) {
@@ -168,7 +172,6 @@ function createBot() {
     if (landBlock) {
       bot.pathfinder.setGoal(new GoalBlock(landBlock.position.x, landBlock.position.y, landBlock.position.z));
     } else {
-      // fallback: try swimming forward a bit
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
       setTimeout(() => {
@@ -189,7 +192,7 @@ function createBot() {
 
   // == RANDOM CHAT ==
   const messages = [
-    "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
+    "mne iman my love", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
     "duatiga duatiga dua empat", "boikot perempuan nme sofea pantek jubo lahanat",
     "if u wana kno spe sofea hmm i dono", "bising do bal", "ko un sme je man",
@@ -213,8 +216,13 @@ function createBot() {
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity?.uuid) return;
 
+    // If bot is hurt, look for nearby attackers
     if (entity.uuid === bot.uuid) {
-      const attacker = getNearestEntity(e => e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 5);
+      const attacker = getNearestEntity(e =>
+        e.type === 'mob' &&
+        hostileMobs.includes(e.name) &&
+        e.position.distanceTo(bot.entity.position) < 6
+      );
       if (attacker) attackEntity(attacker);
 
       const player = getNearestEntity(e =>
