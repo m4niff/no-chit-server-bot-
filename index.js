@@ -40,7 +40,7 @@ function attackEntity(entity) {
   if (!entity?.isValid || bot.health <= 0) return;
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
-  // Skip if entity is in water
+  // Skip mobs in water
   const blockBelow = bot.blockAt(entity.position.offset(0, -1, 0));
   if (blockBelow && blockBelow.name.includes('water')) return;
 
@@ -59,12 +59,12 @@ function attackEntity(entity) {
     }
 
     const dist = bot.entity.position.distanceTo(entity.position);
-    if (dist < 3.5 && bot.canSeeEntity(entity)) {
-      bot.lookAt(entity.position.offset(0, entity.height, 0)).then(() => {
-        bot.attack(entity);
-      }).catch(() => {});
+    if (dist < 3.5) {
+      bot.lookAt(entity.position.offset(0, entity.height, 0))
+        .then(() => bot.attack(entity))
+        .catch(() => {});
     }
-  }, 400);
+  }, 500);
 }
 
 // == CREATE BOT ==
@@ -87,8 +87,9 @@ function createBot() {
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.blocksToAvoid.add(8); // water
-    defaultMove.blocksToAvoid.add(9); // flowing water
+    defaultMove.canSwim = false;
+    defaultMove.blocksToAvoid.add(mcData.blocksByName.water.id);
+    defaultMove.blocksToAvoid.add(mcData.blocksByName.flowing_water.id);
 
     bot.pathfinder.setMovements(defaultMove);
   });
@@ -130,14 +131,14 @@ function createBot() {
 
     if (msg === 'woi ikut aq' && player) {
       followTarget = player;
-      try { bot.chat("sat"); } catch (_) {}
+      bot.chat("sat");
       bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
     }
 
     if (msg === 'woi stop ikut') {
       followTarget = null;
       bot.pathfinder.setGoal(null);
-      try { bot.chat("ok aq stop ikut"); } catch (_) {}
+      bot.chat("ok aq stop ikut");
     }
   });
 
@@ -162,10 +163,9 @@ function createBot() {
     });
 
     if (landBlock) {
-      bot.chat("tolong air");
       bot.pathfinder.setGoal(new GoalBlock(landBlock.position.x, landBlock.position.y, landBlock.position.z));
     } else {
-      // fallback jump + forward
+      // fallback: try swimming forward a bit
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
       setTimeout(() => {
@@ -222,10 +222,10 @@ function createBot() {
 
       if (player && (!lastHitPlayer || lastHitPlayer.uuid !== player.uuid)) {
         lastHitPlayer = player;
-        try { bot.chat("ambik ko"); } catch (_) {}
-        bot.lookAt(player.position.offset(0, player.height, 0)).then(() => {
-          bot.attack(player);
-        }).catch(() => {});
+        bot.chat("ambik ko");
+        bot.lookAt(player.position.offset(0, player.height, 0))
+          .then(() => bot.attack(player))
+          .catch(() => {});
         setTimeout(() => { lastHitPlayer = null }, 10000);
       }
     }
