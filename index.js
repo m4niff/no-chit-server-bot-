@@ -1,3 +1,8 @@
+// index.js - cleaned & improved mineflayer bot
+
+// == CONFIG ==
+const DEBUG = false; // set true to print diagnostic logs
+
 // == IMPORTS ==
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
@@ -6,103 +11,126 @@ const mcDataLoader = require('minecraft-data');
 const express = require('express');
 
 // == STATE ==
-let bot;
-let mcData;
+let bot = null;
+let mcData = null;
 let botSpawned = false;
 let followTarget = null;
-let defaultMove;
+let defaultMove = null;
 let currentTarget = null;
 let attackInterval = null;
 let fatalError = false;
 let messageInterval = null;
 let lastHitPlayer = null;
 
-// == HOSTILE MOBS (lowercase names) ==
+// == HOSTILE MOBS (lowercase simple names) ==
 const hostileMobs = new Set([
   'zombie','drowned','skeleton','creeper','spider','husk',
   'witch','zombified_piglin','zoglin','phantom','vex',
   'pillager','evoker','vindicator','ravager',
   'enderman','blaze','ghast','magma_cube','slime',
   'warden','silverfish','stray','guardian','elder_guardian',
-  'shulker','hoglin'
+  'shulker','hoglin','cave_spider'
 ]);
 
-// == UTILITIES ==
-function safeEntities() {
-  return Object.values(bot?.entities || {});
-}
-
-function normalizeName(name = '') {
-  return String(name).toLowerCase().replace(/^minecraft:/, '');
-}
-
+// == HELPERS ==
+function logd(...args) { if (DEBUG) console.log('[DEBUG]', ...args); }
+function safeEntities() { return Object.values(bot?.entities || {}); }
+function normalizeName(name = '') { return String(name || '').toLowerCase().replace(/^minecraft:/, ''); }
 function isHostileEntity(e) {
-  if (!e || e.type !== 'mob') return false;
-  // entity .name or .mobType or .displayName — try these possibilities
-  const name = normalizeName(e.name || e.mobType || e.displayName || '');
-  return hostileMobs.has(name);
+  if (!e) return false;
+  // Some entities expose .name, some .mobType, fallback to displayName
+  const raw = e.name || e.mobType || e.displayName || '';
+  const n = normalizeName(raw);
+  return hostileMobs.has(n);
 }
-
+function distanceToEntity(e) {
+  if (!e || !bot.entity) return Infinity;
+  try { return bot.entity.position.distanceTo(e.position); } catch (_) { return Infinity; }
+}
 function getNearestEntity(filter) {
   const ents = safeEntities().filter(filter);
   if (!bot || !bot.entity) return undefined;
   ents.sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position));
   return ents[0];
 }
-
 function equipWeapon() {
   if (!bot || !bot.inventory) return Promise.resolve();
-  const preferred = bot.inventory.items().find(i => i.name && i.name.includes('netherite_sword'));
-  const fallback = bot.inventory.items().find(i => i.name && (i.name.includes('sword') || i.name.includes('axe')));
+  // prefer netherite sword
+  const items = bot.inventory.items();
+  const preferred = items.find(i => i.name && i.name.includes('netherite_sword'));
+  const fallback = items.find(i => i.name && (i.name.includes('sword') || i.name.includes('axe')));
   const weapon = preferred || fallback;
-  if (weapon) return bot.equip(weapon, 'hand').catch(() => {});
-  return Promise.resolve();
+  if (!weapon) {
+    logd('No weapon found in inventory');
+    return Promise.resolve();
+  }
+  return bot.equip(weapon, 'hand').then(() => logd('Equipped', weapon.name)).catch(err => {
+    logd('Failed to equip', err && err.message ? err.message : err);
+  });
+}
+
+// Check whether a block is water-like
+function isWaterBlock(block) {
+  if (!block) return false;
+  const nm = normalizeName(block.name || '');
+  return nm.includes('water') || nm.includes('kelp') || nm.includes('seagrass');
 }
 
 // == ATTACK LOGIC ==
-function attackEntity(entity) {
-  if (!botSpawned || !entity || !entity.position || bot.health <= 0) return;
-  if (!entity.isValid) return;
-  if (currentTarget?.uuid === entity.uuid && attackInterval) return;
+function clearAttack() {
+  if (attackInterval) {
+    clearInterval(attackInterval);
+    attackInterval = null;
+  }
+  currentTarget = null;
+  if (bot && bot.pathfinder) bot.pathfinder.setGoal(null);
+}
 
-  // Skip mobs standing in water (optional)
+function attackEntity(entity) {
+  if (!botSpawned || !entity || bot.health <= 0) return;
+  // entity validity: some mineflayer builds have entity.isValid; if missing, assume valid if has position
+  if (entity.isValid === false) return;
+  if (currentTarget && currentTarget.uuid === entity.uuid && attackInterval) return;
+
+  // If mob stands on water, skip (prevent bot going into water)
   try {
     const blockBelow = bot.blockAt(entity.position.offset(0, -1, 0));
-    if (blockBelow && normalizeName(blockBelow.name).includes('water')) {
+    if (isWaterBlock(blockBelow)) {
+      logd('Skipping entity in water:', entity.name);
       return;
     }
   } catch (_) {}
 
-  clearInterval(attackInterval);
+  clearAttack();
   currentTarget = entity;
 
   equipWeapon().finally(() => {
-    // start following (non-forced, so pathfinder will pursue)
-    bot.pathfinder.setGoal(new GoalFollow(entity, 1), false);
+    // start following (pathfinder will try to chase)
+    try {
+      bot.pathfinder.setGoal(new GoalFollow(entity, 1), false);
+    } catch (err) {
+      logd('setGoal follow error:', err && err.message ? err.message : err);
+    }
   });
 
-  // Attack loop (keeps attempting until entity invalid or bot dead)
   attackInterval = setInterval(async () => {
-    if (!entity?.isValid || bot.health <= 0) {
-      clearInterval(attackInterval);
-      attackInterval = null;
-      currentTarget = null;
-      bot.pathfinder.setGoal(null);
+    if (!entity || entity.isValid === false || bot.health <= 0) {
+      clearAttack();
       return;
     }
-
-    const dist = bot.entity.position.distanceTo(entity.position);
-
-    // If too far, re-follow
-    if (dist > 4.5) {
-      bot.pathfinder.setGoal(new GoalFollow(entity, 1), false);
+    const dist = distanceToEntity(entity);
+    logd(`attacking loop — ${entity.name} dist:${dist.toFixed(2)}`);
+    if (dist > 5.0) {
+      // re-follow if far
+      try { bot.pathfinder.setGoal(new GoalFollow(entity, 1), false); } catch (_) {}
       return;
     }
-
-    // close enough: fine tune position and attack
-    bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1.5));
+    // fine-tune position and attack
+    try {
+      bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1.2));
+    } catch (_) {}
     try { await bot.lookAt(entity.position.offset(0, entity.height, 0)); } catch (_) {}
-    try { bot.attack(entity); } catch (_) {}
+    try { bot.attack(entity); } catch (err) { logd('attack() error', err && err.message ? err.message : err); }
   }, 350);
 }
 
@@ -127,7 +155,7 @@ function createBot() {
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
 
-    // Avoid common water blocks
+    // avoid common water blocks if present
     const waterNames = ['water', 'flowing_water', 'kelp', 'seagrass'];
     for (const name of waterNames) {
       const b = mcData.blocksByName?.[name];
@@ -162,58 +190,59 @@ function createBot() {
 
   bot.on('end', () => {
     console.log('🔌 End event - disconnected.');
-    clearInterval(attackInterval);
+    clearAttack();
     clearInterval(messageInterval);
     currentTarget = null;
     botSpawned = false;
     if (!fatalError) setTimeout(createBot, 5000);
   });
 
-  bot.on('respawn', equipWeapon);
-
-  bot.on('death', () => {
-    console.log('☠️ Bot died.');
-    clearInterval(attackInterval);
-    attackInterval = null;
-    currentTarget = null;
+  bot.on('respawn', () => {
+    equipWeapon();
   });
 
-  // == CHAT COMMANDS ==
+  bot.on('death', () => {
+    logd('Bot died — clearing state');
+    clearAttack();
+  });
+
+  // CHAT: follow commands
   bot.on('chat', (username, message) => {
     const msg = String(message || '').toLowerCase();
     const player = bot.players[username]?.entity;
     if (msg === 'woi ikut aq' && player) {
       followTarget = player;
       try { bot.chat('sat'); } catch (_) {}
-      bot.pathfinder.setGoal(new GoalFollow(player, 1), true);
+      try { bot.pathfinder.setGoal(new GoalFollow(player, 1), true); } catch (_) {}
     } else if (msg === 'woi stop ikut') {
       followTarget = null;
-      bot.pathfinder.setGoal(null);
+      try { bot.pathfinder.setGoal(null); } catch (_) {}
       try { bot.chat('ok aq stop ikut'); } catch (_) {}
     }
   });
 
-  // == AUTO HUNT LOOP ==
+  // auto-hunt loop
   setInterval(() => {
     if (!botSpawned || bot.health <= 0) return;
-    if (bot.entity?.isInWater) return; // don't hunt in water
+    // don't hunt while in water
+    if (bot.entity?.isInWater) return;
+    // if already attacking something valid, skip search
+    if (currentTarget && (currentTarget.isValid !== false)) return;
 
-    // if already attacking a valid target, skip
-    if (currentTarget && currentTarget.isValid) return;
-
+    // find nearest hostile mob within radius
     const mob = getNearestEntity(e =>
-      e && e.position && isHostileEntity(e) &&
-      e.position.distanceTo(bot.entity.position) < 16
+      e && e.position && isHostileEntity(e) && e.position.distanceTo(bot.entity.position) < 16
     );
 
     if (mob) {
+      logd('Found mob to attack:', mob.name, 'dist', distanceToEntity(mob).toFixed(2));
       attackEntity(mob);
     } else if (followTarget && followTarget.isValid) {
-      bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true);
+      try { bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true); } catch (_) {}
     }
-  }, 1200);
+  }, 1100);
 
-  // == SILENT WATER ESCAPE ==
+  // silent water escape
   setInterval(() => {
     if (!botSpawned) return;
     if (!bot.entity?.isInWater) return;
@@ -225,10 +254,9 @@ function createBot() {
     });
 
     if (land) {
-      // silent: do NOT chat
-      bot.pathfinder.setGoal(new GoalBlock(land.position.x, land.position.y, land.position.z));
+      try { bot.pathfinder.setGoal(new GoalBlock(land.position.x, land.position.y, land.position.z)); } catch (_) {}
     } else {
-      // fallback: try to move/jump forward briefly
+      // fallback: try move forward / jump briefly
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
       setTimeout(() => {
@@ -236,20 +264,21 @@ function createBot() {
         bot.setControlState('forward', false);
       }, 1200);
     }
-  }, 1500);
+  }, 1400);
 
-  // == RETALIATE WHEN HURT ==
+  // retaliate when hurt
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
-    // if bot was hurt
     if (entity.uuid === bot.uuid) {
-      // try find a nearby hostile mob attacker
+      // find nearby hostile mob attacker
       const attacker = getNearestEntity(e =>
         e && e.position && isHostileEntity(e) && e.position.distanceTo(bot.entity.position) < 6
       );
-      if (attacker) attackEntity(attacker);
-
-      // if a player hit us, respond once
+      if (attacker) {
+        logd('Retaliating vs mob:', attacker.name);
+        attackEntity(attacker);
+      }
+      // if a player hit us, hit them back once
       const player = getNearestEntity(e =>
         e && e.type === 'player' && e.username !== bot.username && e.position.distanceTo(bot.entity.position) < 4
       );
@@ -266,7 +295,7 @@ function createBot() {
     }
   });
 
-  // == AUTO CHAT (optional) ==
+  // optional periodic chat (unchanged)
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
@@ -289,7 +318,7 @@ function createBot() {
 // start
 createBot();
 
-// == KEEP ALIVE ==
+// keep-alive web endpoint
 const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (_, res) => res.send('Mineflayer bot is running!'));
