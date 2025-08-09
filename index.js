@@ -1,7 +1,7 @@
 // index.js - cleaned & improved mineflayer bot
 
 // == CONFIG ==
-const DEBUG = false; // set true to print diagnostic logs
+const DEBUG = true; // set true to print diagnostic logs
 
 // == IMPORTS ==
 const mineflayer = require('mineflayer');
