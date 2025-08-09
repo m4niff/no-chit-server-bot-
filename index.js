@@ -17,14 +17,14 @@ let fatalError = false;
 let messageInterval = null;
 let lastHitPlayer = null;
 
-// == HOSTILE MOBS (lowercase, no namespace) ==
+// == HOSTILE MOBS (lowercase names) ==
 const hostileMobs = new Set([
-  'zombie', 'drowned', 'skeleton', 'creeper', 'spider', 'husk',
-  'witch', 'zombified_piglin', 'zoglin', 'phantom', 'vex',
-  'pillager', 'evoker', 'vindicator', 'ravager',
-  'enderman', 'blaze', 'ghast', 'magma_cube', 'slime',
-  'warden', 'silverfish', 'stray', 'guardian', 'elder_guardian',
-  'shulker', 'hoglin'
+  'zombie','drowned','skeleton','creeper','spider','husk',
+  'witch','zombified_piglin','zoglin','phantom','vex',
+  'pillager','evoker','vindicator','ravager',
+  'enderman','blaze','ghast','magma_cube','slime',
+  'warden','silverfish','stray','guardian','elder_guardian',
+  'shulker','hoglin'
 ]);
 
 // == UTILITIES ==
@@ -38,7 +38,8 @@ function normalizeName(name = '') {
 
 function isHostileEntity(e) {
   if (!e || e.type !== 'mob') return false;
-  const name = normalizeName(e.name || e.mobType || e.displayName);
+  // entity .name or .mobType or .displayName — try these possibilities
+  const name = normalizeName(e.name || e.mobType || e.displayName || '');
   return hostileMobs.has(name);
 }
 
@@ -64,18 +65,23 @@ function attackEntity(entity) {
   if (!entity.isValid) return;
   if (currentTarget?.uuid === entity.uuid && attackInterval) return;
 
+  // Skip mobs standing in water (optional)
   try {
     const blockBelow = bot.blockAt(entity.position.offset(0, -1, 0));
-    if (blockBelow && normalizeName(blockBelow.name).includes('water')) return;
+    if (blockBelow && normalizeName(blockBelow.name).includes('water')) {
+      return;
+    }
   } catch (_) {}
 
   clearInterval(attackInterval);
   currentTarget = entity;
 
   equipWeapon().finally(() => {
+    // start following (non-forced, so pathfinder will pursue)
     bot.pathfinder.setGoal(new GoalFollow(entity, 1), false);
   });
 
+  // Attack loop (keeps attempting until entity invalid or bot dead)
   attackInterval = setInterval(async () => {
     if (!entity?.isValid || bot.health <= 0) {
       clearInterval(attackInterval);
@@ -86,16 +92,17 @@ function attackEntity(entity) {
     }
 
     const dist = bot.entity.position.distanceTo(entity.position);
+
+    // If too far, re-follow
     if (dist > 4.5) {
       bot.pathfinder.setGoal(new GoalFollow(entity, 1), false);
       return;
     }
 
-    if (dist <= 4.5) {
-      bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1.5));
-      try { await bot.lookAt(entity.position.offset(0, entity.height, 0)); } catch (_) {}
-      try { bot.attack(entity); } catch (_) {}
-    }
+    // close enough: fine tune position and attack
+    bot.pathfinder.setGoal(new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1.5));
+    try { await bot.lookAt(entity.position.offset(0, entity.height, 0)); } catch (_) {}
+    try { bot.attack(entity); } catch (_) {}
   }, 350);
 }
 
@@ -120,6 +127,7 @@ function createBot() {
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
 
+    // Avoid common water blocks
     const waterNames = ['water', 'flowing_water', 'kelp', 'seagrass'];
     for (const name of waterNames) {
       const b = mcData.blocksByName?.[name];
@@ -162,6 +170,7 @@ function createBot() {
   });
 
   bot.on('respawn', equipWeapon);
+
   bot.on('death', () => {
     console.log('☠️ Bot died.');
     clearInterval(attackInterval);
@@ -184,10 +193,12 @@ function createBot() {
     }
   });
 
-  // == AUTO HUNT ==
+  // == AUTO HUNT LOOP ==
   setInterval(() => {
     if (!botSpawned || bot.health <= 0) return;
-    if (bot.entity?.isInWater) return;
+    if (bot.entity?.isInWater) return; // don't hunt in water
+
+    // if already attacking a valid target, skip
     if (currentTarget && currentTarget.isValid) return;
 
     const mob = getNearestEntity(e =>
@@ -202,7 +213,7 @@ function createBot() {
     }
   }, 1200);
 
-  // == WATER ESCAPE (silent) ==
+  // == SILENT WATER ESCAPE ==
   setInterval(() => {
     if (!botSpawned) return;
     if (!bot.entity?.isInWater) return;
@@ -214,8 +225,10 @@ function createBot() {
     });
 
     if (land) {
+      // silent: do NOT chat
       bot.pathfinder.setGoal(new GoalBlock(land.position.x, land.position.y, land.position.z));
     } else {
+      // fallback: try to move/jump forward briefly
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
       setTimeout(() => {
@@ -228,27 +241,32 @@ function createBot() {
   // == RETALIATE WHEN HURT ==
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
+    // if bot was hurt
     if (entity.uuid === bot.uuid) {
+      // try find a nearby hostile mob attacker
       const attacker = getNearestEntity(e =>
         e && e.position && isHostileEntity(e) && e.position.distanceTo(bot.entity.position) < 6
       );
       if (attacker) attackEntity(attacker);
 
+      // if a player hit us, respond once
       const player = getNearestEntity(e =>
         e && e.type === 'player' && e.username !== bot.username && e.position.distanceTo(bot.entity.position) < 4
       );
       if (player && (!lastHitPlayer || lastHitPlayer.uuid !== player.uuid)) {
         lastHitPlayer = player;
         try { bot.chat('ambik ko'); } catch (_) {}
-        bot.lookAt(player.position.offset(0, player.height, 0))
-          .then(() => bot.attack(player))
-          .catch(() => {});
+        try {
+          bot.lookAt(player.position.offset(0, player.height, 0))
+            .then(() => bot.attack(player))
+            .catch(() => {});
+        } catch (_) {}
         setTimeout(() => { lastHitPlayer = null; }, 9000);
       }
     }
   });
 
-  // == AUTO CHAT ==
+  // == AUTO CHAT (optional) ==
   const messages = [
     "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal",
     "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
@@ -268,6 +286,7 @@ function createBot() {
   }, 90000);
 }
 
+// start
 createBot();
 
 // == KEEP ALIVE ==
@@ -276,5 +295,6 @@ const port = process.env.PORT || 3000;
 app.get('/', (_, res) => res.send('Mineflayer bot is running!'));
 app.listen(port, () => console.log(`🌐 Server running on port ${port}`));
 
+// global safety
 process.on('uncaughtException', err => console.error('❌ Uncaught Exception:', err));
 process.on('unhandledRejection', err => console.error('❌ Unhandled Rejection:', err));
