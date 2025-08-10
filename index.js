@@ -1,5 +1,5 @@
 // index.js — improved mineflayer bot (set DEBUG=true for diagnostics)
-const DEBUG = true; // set true to print diagnostic logs
+const DEBUG = false; // set true to print diagnostic logs
 
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
