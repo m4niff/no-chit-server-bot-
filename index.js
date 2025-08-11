@@ -24,7 +24,7 @@ const hostileMobs = new Set([
   'pillager','evoker','vindicator','ravager',
   'enderman','blaze','ghast','magma_cube','slime',
   'warden','silverfish','stray','guardian','elder_guardian',
-  'shulker','hoglin'
+  'shulker','hoglin', 'baby_zombie'
 ]);
 
 function logd(...args){ if (DEBUG) console.log('[DEBUG]', ...args); }
