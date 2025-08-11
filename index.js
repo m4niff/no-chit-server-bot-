@@ -13,33 +13,32 @@ let botSpawned = false;
 let followTarget = null;
 let defaultMove = null;
 let currentTarget = null;
-let attackInterval = null;
 let fatalError = false;
 let messageInterval = null;
 let lastHitPlayer = null;
 
+// Hostile names (lowercase short names)
 const hostileMobs = new Set([
   'zombie','drowned','skeleton','creeper','spider','cave_spider','husk',
   'witch','zombified_piglin','zoglin','phantom','vex',
   'pillager','evoker','vindicator','ravager',
   'enderman','blaze','ghast','magma_cube','slime',
   'warden','silverfish','stray','guardian','elder_guardian',
-  'shulker','hoglin', 'baby_zombie'
+  'shulker','hoglin','baby_zombie'
 ]);
 
 function logd(...args){ if (DEBUG) console.log('[DEBUG]', ...args); }
 function safeEntities(){ return Object.values(bot?.entities || {}); }
-function normalizeName(name = ''){ return String(name || '').toLowerCase().replace(/^minecraft:/, ''); }
+function normalizeName(n=''){ return String(n||'').toLowerCase().replace(/^minecraft:/, ''); }
 
-// Robust conversion of entity name/displayName to plain lowercase id-like text
+// Convert entity to a canonical lowercase short name safely
 function entityNameSafe(e){
   if (!e) return '';
-  // displayName may be a ChatMessage object; String(...) yields readable text
   try {
     if (e.displayName) return normalizeName(String(e.displayName));
   } catch(_) {}
   if (e.name) return normalizeName(String(e.name));
-  // older versions / some plugins use mobType (deprecated) — include as last resort
+  // some older versions or prismarine give mobType — use as last resort (avoid getter spam)
   try { if (e.mobType) return normalizeName(String(e.mobType)); } catch(_) {}
   return '';
 }
@@ -47,7 +46,7 @@ function entityNameSafe(e){
 function isHostileEntity(e){
   const n = entityNameSafe(e);
   if (!n) return false;
-  // Some servers prefix or localize names, try to reduce: take last segment after ":" or spaces
+  // try simple suffix (in case a plugin/localization added prefixes)
   const simple = n.split(' ').pop().split(':').pop();
   return hostileMobs.has(simple) || hostileMobs.has(n);
 }
@@ -59,7 +58,7 @@ function distanceToEntity(e){
 
 function getNearestEntity(filter){
   const ents = safeEntities().filter(filter);
-  if (!bot || !bot.entity) return undefined;
+  if (!bot || !bot.entity || ents.length === 0) return undefined;
   ents.sort((a,b) => {
     try { return a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position); }
     catch(_) { return 0; }
@@ -73,7 +72,7 @@ function equipWeapon(){
   const preferred = items.find(i => i.name && i.name.includes('netherite_sword'));
   const fallback = items.find(i => i.name && (i.name.includes('sword') || i.name.includes('axe')));
   const weapon = preferred || fallback;
-  if (!weapon) { logd('No weapon in inventory'); return Promise.resolve(); }
+  if (!weapon) { logd('No weapon'); return Promise.resolve(); }
   return bot.equip(weapon, 'hand').then(() => logd('Equipped', weapon.name)).catch(err => logd('Equip failed', err && err.message));
 }
 
@@ -83,60 +82,85 @@ function isWaterBlock(block){
   return nm.includes('water') || nm.includes('kelp') || nm.includes('seagrass');
 }
 
-function clearAttack(){
-  if (attackInterval) { clearInterval(attackInterval); attackInterval = null; }
+// Clear current target and stop chasing
+function clearTarget(){
   currentTarget = null;
-  try { bot?.pathfinder?.setGoal(null); } catch(_) {}
+  try { bot.pathfinder.setGoal(null); } catch(_) {}
 }
 
-function attackEntity(entity){
-  if (!botSpawned || !entity || bot.health <= 0) return;
-  if (entity.isValid === false) return;
-  if (currentTarget && currentTarget.uuid === entity.uuid && attackInterval) return;
+// Primary attack loop (single interval, simpler behaviour)
+let mainAttackLoop = null;
+function startMainAttackLoop(){
+  if (mainAttackLoop) return;
+  mainAttackLoop = setInterval(async () => {
+    if (!botSpawned || bot.health <= 0) return;
 
-  // avoid chasing mobs that are standing on water (optional)
-  try {
-    if (entity.position) {
-      const below = bot.blockAt(entity.position.offset(0, -1, 0));
-      if (isWaterBlock(below)) { logd('Skipping mob in water:', entityNameSafe(entity)); return; }
+    // If follow target exists and no currentTarget, re-assert follow
+    if (!currentTarget && followTarget && followTarget.isValid) {
+      try { bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true); } catch(_) {}
     }
-  } catch(_) {}
 
-  clearAttack();
-  currentTarget = entity;
+    // If we already are attacking a target, handle it here
+    if (currentTarget && currentTarget.isValid !== false) {
+      const dist = distanceToEntity(currentTarget);
+      logd('MAIN: currentTarget', entityNameSafe(currentTarget), 'dist', dist.toFixed ? dist.toFixed(2) : dist);
 
-  equipWeapon().finally(() => {
-    try {
-      // force follow so pathfinder keeps replanning while mob moves
-      bot.pathfinder.setGoal(new GoalFollow(entity, 1), true);
-      logd('Chasing', entityNameSafe(entity));
-    } catch(err) {
-      logd('setGoal follow error:', err && err.message);
-    }
-  });
+      // Drop target if vanished or too far
+      if (dist === Infinity || dist > 40 || currentTarget.isValid === false) {
+        clearTarget();
+        return;
+      }
 
-  attackInterval = setInterval(async () => {
-    if (!entity || entity.isValid === false || bot.health <= 0) { clearAttack(); return; }
+      // If target is in water, drop it (we avoid water)
+      try {
+        const below = bot.blockAt(currentTarget.position.offset(0, -1, 0));
+        if (isWaterBlock(below)) { logd('MAIN: target in water - dropping', entityNameSafe(currentTarget)); clearTarget(); return; }
+      } catch(_) {}
 
-    const dist = distanceToEntity(entity);
-    logd('attackLoop', entityNameSafe(entity), 'dist', dist.toFixed ? dist.toFixed(2) : dist);
+      // If far, force follow and let pathfinder chase
+      if (dist > 2.2) {
+        try { bot.pathfinder.setGoal(new GoalFollow(currentTarget, 1), true); } catch(_) {}
+        return;
+      }
 
-    // if target disappeared or far away — drop it
-    if (dist === Infinity || dist > 40) { clearAttack(); return; }
-
-    // if still far, keep following (force)
-    if (dist > 2.2) {
-      try { bot.pathfinder.setGoal(new GoalFollow(entity, 1), true); } catch(_) {}
+      // close: stop pathfinder and attack directly
+      try { bot.pathfinder.setGoal(null); } catch(_) {}
+      try { await bot.lookAt(currentTarget.position.offset(0, currentTarget.height, 0)); } catch(_) {}
+      try { bot.attack(currentTarget); } catch(err){ logd('MAIN attack err', err && err.message); }
       return;
     }
 
-    // close enough: stop pathfinder and attack directly
-    try { bot.pathfinder.setGoal(null); } catch(_) {}
-    try { await bot.lookAt(entity.position.offset(0, entity.height, 0)); } catch(_) {}
-    try { bot.attack(entity); } catch(err) { logd('attack err', err && err.message); }
+    // If no current target, search for nearest hostile mob (within radius)
+    if (!currentTarget) {
+      // don't search while in water
+      if (bot.entity?.isInWater) return;
+
+      const mob = getNearestEntity(ent =>
+        ent && ent.position && isHostileEntity(ent) && ent.position.distanceTo(bot.entity.position) < 16
+      );
+
+      if (mob) {
+        logd('MAIN: found mob', entityNameSafe(mob), 'dist', distanceToEntity(mob).toFixed ? distanceToEntity(mob).toFixed(2) : distanceToEntity(mob));
+        // avoid mobs standing on water
+        try {
+          const below = bot.blockAt(mob.position.offset(0,-1,0));
+          if (isWaterBlock(below)) { logd('MAIN: mob on water skip', entityNameSafe(mob)); return; }
+        } catch(_) {}
+        currentTarget = mob;
+        await equipWeapon().catch(()=>{});
+        try { bot.pathfinder.setGoal(new GoalFollow(mob, 1), true); } catch(_) {}
+      } else if (followTarget && followTarget.isValid) {
+        try { bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true); } catch(_) {}
+      }
+    }
   }, 300);
 }
 
+function stopMainAttackLoop(){
+  if (mainAttackLoop) { clearInterval(mainAttackLoop); mainAttackLoop = null; }
+}
+
+// Create and configure bot
 function createBot(){
   if (fatalError) return;
 
@@ -157,7 +181,7 @@ function createBot(){
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
 
-    for (const nm of ['water', 'flowing_water', 'kelp', 'seagrass']) {
+    for (const nm of ['water','flowing_water','kelp','seagrass']) {
       const b = mcData.blocksByName?.[nm];
       if (b) defaultMove.blocksToAvoid.add(b.id);
     }
@@ -166,6 +190,7 @@ function createBot(){
 
     equipWeapon();
     console.log('✅ Bot spawned and equipped.');
+    startMainAttackLoop();
   });
 
   function checkDisconnect(reason){
@@ -178,19 +203,20 @@ function createBot(){
 
   bot.on('login', () => console.log('✅ Logged in.'));
   bot.on('kicked', checkDisconnect);
-  bot.on('error', err => checkDisconnect(err?.message || err));
-  bot.on('end', () => { clearAttack(); clearInterval(messageInterval); botSpawned = false; if (!fatalError) setTimeout(createBot, 5000); });
-  bot.on('respawn', equipWeapon);
-  bot.on('death', clearAttack);
+  bot.on('error', err => { console.warn('⚠ Bot error:', err?.message || err); checkDisconnect(err?.message || err); });
+  bot.on('end', () => { clearTarget(); stopMainAttackLoop(); clearInterval(messageInterval); botSpawned = false; if (!fatalError) setTimeout(createBot, 5000); });
+  bot.on('respawn', () => { equipWeapon(); });
+  bot.on('death', () => { clearTarget(); });
 
-  // follow commands
+  // chat commands
   bot.on('chat', (username, message) => {
-    const msg = String(message || '').toLowerCase();
+    const msg = String(message||'').toLowerCase();
     const player = bot.players[username]?.entity;
     if (msg === 'woi ikut aq' && player) {
       followTarget = player;
       try { bot.chat('sat'); } catch(_) {}
       try { bot.pathfinder.setGoal(new GoalFollow(player, 1), true); } catch(_) {}
+      // ensure we don't clear followTarget elsewhere
     } else if (msg === 'woi stop ikut') {
       followTarget = null;
       try { bot.pathfinder.setGoal(null); } catch(_) {}
@@ -198,30 +224,10 @@ function createBot(){
     }
   });
 
-  // auto-hunt loop
+  // water escape (silent)
   setInterval(() => {
-    if (!botSpawned || bot.health <= 0) return;
-    if (bot.entity?.isInWater) return; // don't hunt while in water
-
-    // drop invalid or too-far current target
-    if (currentTarget && (currentTarget.isValid === false || distanceToEntity(currentTarget) > 40)) clearAttack();
-    if (currentTarget && currentTarget.isValid !== false && distanceToEntity(currentTarget) <= 40) return;
-
-    const mob = getNearestEntity(e =>
-      e && e.position && isHostileEntity(e) && e.position.distanceTo(bot.entity.position) < 16
-    );
-
-    if (mob) {
-      logd('Found mob', entityNameSafe(mob), 'dist', distanceToEntity(mob).toFixed(2));
-      attackEntity(mob);
-    } else if (followTarget && followTarget.isValid) {
-      try { bot.pathfinder.setGoal(new GoalFollow(followTarget, 1), true); } catch(_) {}
-    }
-  }, 800);
-
-  // silent water escape (no chat)
-  setInterval(() => {
-    if (!botSpawned || !bot.entity?.isInWater) return;
+    if (!botSpawned || !bot.entity) return;
+    if (!bot.entity.isInWater) return;
     const land = bot.findBlock({
       matching: b => b && b.boundingBox === 'block' && !normalizeName(b.name).includes('water'),
       maxDistance: 12,
@@ -232,11 +238,11 @@ function createBot(){
     } else {
       bot.setControlState('jump', true);
       bot.setControlState('forward', true);
-      setTimeout(() => { bot.setControlState('jump', false); bot.setControlState('forward', false); }, 1200);
+      setTimeout(()=>{ bot.setControlState('jump', false); bot.setControlState('forward', false); }, 1200);
     }
   }, 1400);
 
-  // retaliate on hurt
+  // retaliate when hurt
   bot.on('entityHurt', (entity) => {
     if (!botSpawned || !entity) return;
     if (entity.uuid === bot.uuid) {
@@ -244,8 +250,9 @@ function createBot(){
         e && e.position && isHostileEntity(e) && e.position.distanceTo(bot.entity.position) < 6
       );
       if (attacker) {
-        logd('Retaliating vs', entityNameSafe(attacker));
-        attackEntity(attacker);
+        logd('retaliate vs', entityNameSafe(attacker));
+        currentTarget = attacker;
+        try { bot.pathfinder.setGoal(new GoalFollow(attacker, 1), true); } catch(_) {}
       }
 
       const player = getNearestEntity(e => e && e.type === 'player' && e.username !== bot.username && e.position.distanceTo(bot.entity.position) < 4);
@@ -258,8 +265,8 @@ function createBot(){
     }
   });
 
-  // periodic chat (optional)
-  const messages = [ "mne iman my love", "kaya siak server baru", "bising bdo karina", "mne iqbal", "amirul hadif x nurul iman very very sweet good", "gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam", "duatiga duatiga dua empat", "boikot perempuan nme sofea pantek jubo lahanat", "if u wana kno spe sofea hmm i dono", "bising do bal", "ko un sme je man", "apa ko bob", "okok ma bad ma fault gng🥀", "sat berak sat", "sunyi siak", "MUSTARRRRRRRDDDDDDDD", "ok aq ulang blik dri awal" ];
+  // optional periodic chat
+  const messages = ["mne iman my love","kaya siak server baru","bising bdo karina","mne iqbal","amirul hadif x nurul iman very very sweet good","gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam","duatiga duatiga dua empat","boikot perempuan nme sofea pantek jubo lahanat","if u wana kno spe sofea hmm i dono","bising do bal","ko un sme je man","apa ko bob","okok ma bad ma fault gng🥀","sat berak sat","sunyi siak","MUSTARRRRRRRDDDDDDDD","ok aq ulang blik dri awal"];
   let chatIndex = 0;
   messageInterval = setInterval(() => {
     if (botSpawned && bot.health > 0) {
