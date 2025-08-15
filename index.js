@@ -178,19 +178,12 @@ function createBot(){
   bot.once('spawn', () => {
     botSpawned = true;
     mcData = mcDataLoader(bot.version);
-
-    // Movements tuned for low lag & no digging/swimming
+    
+// Movements tuned for low lag & no digging/swimming
     defaultMove = new Movements(bot, mcData);
     defaultMove.allowSprinting = true;
     defaultMove.canDig = false;
-    defaultMove.canSwim = false;
-
-    // avoid water/kelp/seagrass
-    for (const nm of ['water','flowing_water','kelp','seagrass']) {
-      const b = mcData.blocksByName?.[nm];
-      if (b) defaultMove.blocksToAvoid.add(b.id);
-    }
-    bot.pathfinder.setMovements(defaultMove);
+    defaultMove.canSwim = true;
 
     // lower view distance to reduce bandwidth/packet load (tiny|short|normal|far)
     try { bot.settings.viewDistance = 'short'; } catch {}
@@ -242,32 +235,12 @@ function createBot(){
       followTarget = player;
       try { bot.chat('sat'); } catch {}
       maybeReplanFollow(player);
-    } else if (msg === 'woi stop ikut') {
+    } else if (msg === 'stop ikut') {
       followTarget = null;
       try { bot.pathfinder.setGoal(null); } catch {}
       try { bot.chat('ok aq stop ikut'); } catch {}
     }
   });
-
-  // ====== Water escape (silent) ======
-  setInterval(() => {
-    if (!botSpawned || !bot.entity?.isInWater) return;
-    const land = bot.findBlock({
-      matching: b => b && b.boundingBox === 'block' && !normalizeName(b.name).includes('water'),
-      maxDistance: 12,
-      point: bot.entity.position
-    });
-    if (land) {
-      try { bot.pathfinder.setGoal(new GoalBlock(land.position.x, land.position.y, land.position.z)); } catch {}
-    } else {
-      bot.setControlState('jump', true);
-      bot.setControlState('forward', true);
-      setTimeout(() => {
-        bot.setControlState('jump', false);
-        bot.setControlState('forward', false);
-      }, 1200);
-    }
-  }, 1400);
 
   // ====== Retaliate when hurt ======
   bot.on('entityHurt', (entity) => {
@@ -295,7 +268,7 @@ function createBot(){
 
   // ====== Optional periodic chat ======
   const messages = [
-    "mne iman my love","kaya siak server baru","bising bdo karina","mne iqbal",
+    "mne iman my love","keje koloh dh siapka","bising bdo karina","mne iqbal",
     "amirul hadif x nurul iman very very sweet good","gpp jadi sok asik asalkan aq tolong on kan server ni 24 jam",
     "duatiga duatiga dua empat","boikot perempuan nme sofea pantek jubo lahanat","if u wana kno spe sofea hmm i dono",
     "bising do bal","ko un sme je man","apa ko bob","okok ma bad ma fault gng🥀",
