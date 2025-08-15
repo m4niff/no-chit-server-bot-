@@ -27,7 +27,7 @@ let lastReplanAt = 0;
 // ====== Hostiles (lowercase short ids) ======
 const hostileMobs = new Set([
   'zombie','drowned','skeleton','creeper','spider','cave_spider','husk',
-  'witch','zombified_piglin','zoglin','phantom','vex',
+  'witch','piglin','zoglin','phantom','vex',
   'pillager','evoker','vindicator','ravager',
   'enderman','blaze','ghast','magma_cube','slime',
   'warden','silverfish','stray','guardian','elder_guardian',
